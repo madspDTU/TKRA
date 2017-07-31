@@ -7,6 +7,8 @@ import refCostFun.*;
 public class test {
 
 	public static void main(String[] args) {
+		
+		//TEST TO SEE IF PuSH IS WORKING!
 		//Define some network directories to choose from
 		String publicNetworkDirFromCalc = "//tsclient/O/Public/DMC/temp/Mads Paulsen (Network)/TransportationNetworks-master/";
 		String publicNetworkDirFromPC = "O:/Public/DMC/temp/Mads Paulsen (Network)/TransportationNetworks-master/";
