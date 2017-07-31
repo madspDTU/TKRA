@@ -1,6 +1,5 @@
 "# My project's README" 
-@author mesch
-RSUET code from Master Thesis "Estimation of equilibrium models for road traffic based on traffic counts on observed routes", 
-with many changes and improvements. 
 
-Modules for MLE have been removed to keep the code simple, and since they did not perform that well.
+This is a repository for on-going research concerning RSUET and TMNL.
+
+The code was initially written by Morten Emmamnuel Schiøler - a former employee at DTU Management - but is now maintained Thomas Kjær Rasmussen.
