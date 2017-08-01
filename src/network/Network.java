@@ -48,17 +48,18 @@ import refCostFun.RefCostFun;
  * @see RouteChoiceModel
  */
 public class Network {
-	
+
 	public String delim = ";";
 	public int  tempCounter = 0;
-	public int odCounter = 0;
-	
+	public int OCounter = 0;
+	public double maximumCostRatio = 50;
+
 
 	/**  
 	 * Name of the network.
 	 */
 	private String networkName;
-	
+
 	public double minimumFlowToBeConsideredUsed = 0;
 
 
@@ -569,9 +570,8 @@ public class Network {
 	 * that the user should not expect this method to function on even
 	 * medium-size networks.
 	 */
-	
-	public double tolerance;
-	
+
+
 	public void generateUniversalChoiceSet() {
 		if (isUniversalChoiceSetGenerated) return;
 		System.out.println("Generating universal choice set...");
@@ -581,25 +581,29 @@ public class Network {
 		boolean[] unvisited;
 		int numNodes = getNumNodes();
 		long start = System.currentTimeMillis();
+		double tolerance;
 		for (HashMap<Integer, OD> m: ods.values()) {
+			OCounter++;
+			System.out.println("Origin #" + OCounter + " of " + ods.size() + " is being processed.");
+			int DCounter = 0;
 			for (OD od: m.values()) { // For each OD-pair; "minos" works on the OD-level
-				odCounter++;
+				DCounter++;
+				System.out.println("     Destination #" + DCounter + " of " + m.size() + " is being processed.");
+				dijkstraMinPriorityQueue(this.getNode(od.D));
+				Path path = shortestPath(new OD(od.D,od.O,od.demand));
+				tolerance = path.updateCost() * maximumCostRatio;
+				
 				od.R = new ArrayList<Path>();
 				currentPath = new int[1];
 				u = od.O; // Recursion starts in the origin node
 				currentPath[0] = u;
 				lengthOfCurrentPath = 0;
-				dijkstraMinPriorityQueue(this.getNode(od.O));
-				Path path = shortestPath(od);
-				path.updateCost();
-				tolerance = path.genCost * 2d;
-				System.out.println("Searching for paths shorter than " + tolerance);
+			
 				unvisited = new boolean[numNodes];
 				Arrays.fill(unvisited, true);
 				unvisited[u - 1] = false; // Origin node starts out as visited
 
-				minos(od, u, currentPath, lengthOfCurrentPath, unvisited);
-				
+				minos(od, u, currentPath, lengthOfCurrentPath, unvisited, tolerance);
 			}
 		}
 		//		updateUniversalDeltas(); // Updates "deltaUniversal" for use in Pathsize
@@ -736,8 +740,13 @@ public class Network {
 		//		Add only the origin node to the priority queue
 		Q.add(originNode);
 		Qbuddy.add(originNodeID);
-		for (OD od: ods.get(originNodeID).values()) {
-			destinations.add(od.D);
+	//	for (OD od : ods.get(originNodeID).values()) {
+	//		destinations.add(od.D);
+	//	}
+		for(int nodeId : nodes.keySet()){
+			if(nodeId != originNode.getId()){
+				destinations.add(nodeId);
+			}
 		}
 	}
 
@@ -829,7 +838,7 @@ public class Network {
 	 * @param unvisited an array such that unvisited[i] is true if node i
 	 * has not yet been visited
 	 */
-	private void minos(OD od, int u, int[] currentPath, double lengthOfCurrentPath, boolean[] unvisited) {
+	private void minos(OD od, int u, int[] currentPath, double lengthOfCurrentPath, boolean[] unvisited, double tolerance) {
 		// Recursive function to enumerate and save all acyclic paths.
 		for (int v : this.getNode(u).getNeighbours()) {
 			if (v == od.D) {// Base case: The considered node is the
@@ -839,13 +848,11 @@ public class Network {
 					newNodeSeq[i] = Integer.valueOf(currentPath[i]);
 				}
 				newNodeSeq[newNodeSeq.length - 1] = v;
-												
+
 				this.addPathToR(od, newNodeSeq); // add path to R
-			} else if (unvisited[v - 1]) { // Else, find all acyclic routes from
+			} else if (unvisited[v - 1] && lengthOfCurrentPath + nodes.get(v).dijkstraDist <= tolerance) { // Else, find all acyclic routes from
 				// unvisited neighbours
-				
 				double lengthOfNewCurrentPath = lengthOfCurrentPath + edgesNodePair.get(u).get(v).getGenCost();
-				if( lengthOfNewCurrentPath > tolerance) return;
 				
 				int[] newCurrentPath = new int[currentPath.length + 1];
 				//a deepcopy is required here to avoid paths being modified 
@@ -860,13 +867,8 @@ public class Network {
 					newUnvisited[i] = unvisited[i];
 				}
 				newUnvisited[v - 1] = false;
-				
-				tempCounter++;
-				if(tempCounter % 100000 == 0){
-					System.out.println(tempCounter + " " + odCounter);
-				}
-				
-				minos(od, v, newCurrentPath, lengthOfNewCurrentPath, newUnvisited);
+
+				minos(od, v, newCurrentPath, lengthOfNewCurrentPath, newUnvisited, tolerance);
 			}
 		}
 		return;
@@ -1243,7 +1245,7 @@ public class Network {
 			}
 			rowScanner.close();
 			System.out.println("Done!");
-			
+
 			System.out.print("Reading nodes... ");
 			// Read node data
 
@@ -1286,11 +1288,11 @@ public class Network {
 					nodes.put(Id, node);
 				}
 			}
-			
+
 			System.out.println("Done!");
 			System.out.println("Reading demand: ");
 			System.out.println("ODs read   Time [s]   Free memory [mb]");
-			
+
 			// Read OD data (trip demand)
 			file = new File(filename3);
 			rowScanner = new Scanner(file);
@@ -1353,10 +1355,10 @@ public class Network {
 			rowScanner.close();
 			this.numOD = numOD;
 			System.out.println("Done!");
-			
+
 			// Generate conditional data
 			// Generate neighbours
-			
+
 			System.out.print("Finalising... ");
 			for (Edge edge: edges) {
 				int tail = edge.getTail();
@@ -1475,6 +1477,12 @@ public class Network {
 		}
 	}
 
+	
+	public void setMaximumCostRatio(double maximumCostRatio){
+		this.maximumCostRatio = maximumCostRatio;
+	}
+	
+	
 	/**
 	 * Uses the predecessors of each nodes found by a dijktra's algorithm
 	 * to determine the shortest path from O to D. This method only
@@ -1490,7 +1498,6 @@ public class Network {
 
 		// First construct inverse sequence as array list
 		ArrayList<Integer> invSeq = new ArrayList<Integer>();
-
 		// Backtrack the path from the destination until origin is reached
 		Node u = destination;
 		while (u != origin) {

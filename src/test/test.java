@@ -17,7 +17,10 @@ public class test {
 	//	String networkName = "SiouxFalls"; //Choose network
 		String networkName = "Anaheim";
 //		String networkName = "Berlin-Friedrichshain"; //Choose network
+		double maximumCostRatio = 1.4;
+		
 		Network network = new Network(networkDirectory + networkName); //Initialize network
+		network.setMaximumCostRatio(maximumCostRatio);
 		network.minimumFlowToBeConsideredUsed = 0; // Allows flows of 0 to be considered too. Switch to a value higher than 0 to make cut-off.
 
 		RefCostFun phi = new RefCostTauMin(1.3); //lower reference cost in RSUET
@@ -28,7 +31,7 @@ public class test {
 
 		RUM rum = new TMNL(omega); //TMNL random utility model -- explicitly state to use ref cost omega 
 		RSUET routeChoiceModel = new RSUET(rum, phi,omega); //set up the TMNL RSUET(min, min + 10)
-		routeChoiceModel.maximumCostRatio = 50;
+		routeChoiceModel.maximumCostRatio = maximumCostRatio;
 		routeChoiceModel.epsilon = 0.00005;
 
 
