@@ -14,8 +14,9 @@ public class test {
 
 		String networkDirectory = localNetworkDir; //Define directory of networks
 		
-//		String networkName = "SiouxFalls"; //Choose network
-		String networkName = "EMA2"; //Choose network
+	//	String networkName = "SiouxFalls"; //Choose network
+		String networkName = "Anaheim";
+//		String networkName = "Berlin-Friedrichshain"; //Choose network
 		Network network = new Network(networkDirectory + networkName); //Initialize network
 		network.minimumFlowToBeConsideredUsed = 0; // Allows flows of 0 to be considered too. Switch to a value higher than 0 to make cut-off.
 

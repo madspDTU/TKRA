@@ -48,6 +48,11 @@ import refCostFun.RefCostFun;
  * @see RouteChoiceModel
  */
 public class Network {
+	
+	public String delim = ";";
+	public int  tempCounter = 0;
+	public int odCounter = 0;
+	
 
 	/**  
 	 * Name of the network.
@@ -564,29 +569,42 @@ public class Network {
 	 * that the user should not expect this method to function on even
 	 * medium-size networks.
 	 */
+	
+	public double tolerance;
+	
 	public void generateUniversalChoiceSet() {
 		if (isUniversalChoiceSetGenerated) return;
 		System.out.println("Generating universal choice set...");
 		int u;
 		int[] currentPath;
+		double lengthOfCurrentPath;
 		boolean[] unvisited;
 		int numNodes = getNumNodes();
+		long start = System.currentTimeMillis();
 		for (HashMap<Integer, OD> m: ods.values()) {
 			for (OD od: m.values()) { // For each OD-pair; "minos" works on the OD-level
+				odCounter++;
 				od.R = new ArrayList<Path>();
-				u = od.O; // Recursion starts in the origin node
 				currentPath = new int[1];
+				u = od.O; // Recursion starts in the origin node
 				currentPath[0] = u;
+				lengthOfCurrentPath = 0;
+				dijkstraMinPriorityQueue(this.getNode(od.O));
+				Path path = shortestPath(od);
+				path.updateCost();
+				tolerance = path.genCost * 2d;
+				System.out.println("Searching for paths shorter than " + tolerance);
 				unvisited = new boolean[numNodes];
 				Arrays.fill(unvisited, true);
 				unvisited[u - 1] = false; // Origin node starts out as visited
 
-				minos(od, u, currentPath, unvisited);
+				minos(od, u, currentPath, lengthOfCurrentPath, unvisited);
 				
 			}
 		}
 		//		updateUniversalDeltas(); // Updates "deltaUniversal" for use in Pathsize
 		// Factor calculation
+		System.out.println((System.currentTimeMillis() - start)/1000d);
 		System.out.println("Universal choice set successfully generated.");
 		isUniversalChoiceSetGenerated = true;
 	}
@@ -811,19 +829,24 @@ public class Network {
 	 * @param unvisited an array such that unvisited[i] is true if node i
 	 * has not yet been visited
 	 */
-	private void minos(OD od, int u, int[] currentPath, boolean[] unvisited) {
+	private void minos(OD od, int u, int[] currentPath, double lengthOfCurrentPath, boolean[] unvisited) {
 		// Recursive function to enumerate and save all acyclic paths.
 		for (int v : this.getNode(u).getNeighbours()) {
 			if (v == od.D) {// Base case: The considered node is the
 				// destination. Add path and cont.
 				int[] newNodeSeq = new int[currentPath.length + 1];
-				for (int i = 0; i < currentPath.length; i++) {
-					newNodeSeq[i] = currentPath[i];
+				for (int i = 0; i < currentPath.length ; i++) {
+					newNodeSeq[i] = Integer.valueOf(currentPath[i]);
 				}
 				newNodeSeq[newNodeSeq.length - 1] = v;
+												
 				this.addPathToR(od, newNodeSeq); // add path to R
 			} else if (unvisited[v - 1]) { // Else, find all acyclic routes from
 				// unvisited neighbours
+				
+				double lengthOfNewCurrentPath = lengthOfCurrentPath + edgesNodePair.get(u).get(v).getGenCost();
+				if( lengthOfNewCurrentPath > tolerance) return;
+				
 				int[] newCurrentPath = new int[currentPath.length + 1];
 				//a deepcopy is required here to avoid paths being modified 
 				//		from other recursions
@@ -837,8 +860,13 @@ public class Network {
 					newUnvisited[i] = unvisited[i];
 				}
 				newUnvisited[v - 1] = false;
-
-				minos(od, v, newCurrentPath, newUnvisited);
+				
+				tempCounter++;
+				if(tempCounter % 100000 == 0){
+					System.out.println(tempCounter + " " + odCounter);
+				}
+				
+				minos(od, v, newCurrentPath, lengthOfNewCurrentPath, newUnvisited);
 			}
 		}
 		return;
