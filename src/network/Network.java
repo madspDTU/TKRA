@@ -588,11 +588,11 @@ public class Network {
 			int DCounter = 0;
 			for (OD od: m.values()) { // For each OD-pair; "minos" works on the OD-level
 				DCounter++;
-				System.out.println("     Destination #" + DCounter + " of " + m.size() + " is being processed.");
+				System.out.print("     Destination #" + DCounter + " of " + m.size() + " is being processed.");
 				dijkstraMinPriorityQueue(this.getNode(od.D));
 				Path path = shortestPath(new OD(od.D,od.O,od.demand));
 				tolerance = path.updateCost() * maximumCostRatio;
-				
+				System.out.println(" Maximum cost is " + tolerance + ".");
 				od.R = new ArrayList<Path>();
 				currentPath = new int[1];
 				u = od.O; // Recursion starts in the origin node
