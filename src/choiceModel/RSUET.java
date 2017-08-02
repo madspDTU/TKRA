@@ -273,7 +273,7 @@ public class RSUET extends RouteChoiceModel {
 		network.generateUniversalChoiceSet();
 
 		//Heuristically "cut" universal choice sets down to a more manageable size
-		network.cutUniversalChoiceSets(maximumCostRatio);
+		//network.cutUniversalChoiceSets(maximumCostRatio);    //madsp: Should not be used, when constrained enumeration is used for creating the "universal" choice set.
 
 		network.updatePathCosts();
 

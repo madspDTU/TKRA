@@ -18,9 +18,11 @@ public class test {
 		String networkName = "Anaheim";
 //		String networkName = "Berlin-Friedrichshain"; //Choose network
 		double maximumCostRatio = 1.4;
+		double localMaximumCostRatio = 2;
 		
 		Network network = new Network(networkDirectory + networkName); //Initialize network
 		network.setMaximumCostRatio(maximumCostRatio);
+		network.setLocalMaximumCostRatio(localMaximumCostRatio);
 		network.minimumFlowToBeConsideredUsed = 0; // Allows flows of 0 to be considered too. Switch to a value higher than 0 to make cut-off.
 
 		RefCostFun phi = new RefCostTauMin(1.3); //lower reference cost in RSUET

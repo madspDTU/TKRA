@@ -49,8 +49,12 @@ import refCostFun.RefCostFun;
  */
 public class Network {
 
+	public HashMap<Integer,HashMap<Integer,Integer>> dijkstraPrevs = new HashMap<Integer,HashMap<Integer,Integer>>();
+	public HashMap<Integer,HashMap<Integer,Double>> dijkstraDists = new HashMap<Integer,HashMap<Integer,Double>>();
+	
 	public String delim = ";";
-	public int  tempCounter = 0;
+	public long  totalNumberOfPaths = 0;
+	public long  totalNumberOfNodesInPaths = 0;
 	public int OCounter = 0;
 	public double maximumCostRatio = 50;
 
@@ -404,6 +408,17 @@ public class Network {
 
 		return true;
 	}
+	
+	public void dijkstraMinPriorityQueueWithStorage(Node originNode) {
+		dijkstraMinPriorityQueue(originNode);
+		int id = originNode.getId();
+		dijkstraPrevs.put(id,new HashMap<Integer,Integer>());
+		dijkstraDists.put(id,new HashMap<Integer,Double>());
+		for(Node v : nodes.values()){
+			dijkstraPrevs.get(id).put(v.getId(), v.dijkstraPrev.getId());
+			dijkstraDists.get(id).put(v.getId(), v.dijkstraDist);
+		}
+	}
 
 	/**
 	 * Draws this network with StdDraw using Node coordinates.
@@ -571,7 +586,15 @@ public class Network {
 	 * medium-size networks.
 	 */
 
-
+	double tolerance;
+	private double localMaximumCostRatio;
+	
+	public void generateAllShortestPathTrees(){
+		for (Node origin : nodes.values()){
+			dijkstraMinPriorityQueueWithStorage(origin);
+		}
+	}
+	
 	public void generateUniversalChoiceSet() {
 		if (isUniversalChoiceSetGenerated) return;
 		System.out.println("Generating universal choice set...");
@@ -580,8 +603,8 @@ public class Network {
 		double lengthOfCurrentPath;
 		boolean[] unvisited;
 		int numNodes = getNumNodes();
+		generateAllShortestPathTrees();
 		long start = System.currentTimeMillis();
-		double tolerance;
 		for (HashMap<Integer, OD> m: ods.values()) {
 			OCounter++;
 			System.out.println("Origin #" + OCounter + " of " + ods.size() + " is being processed.");
@@ -589,10 +612,12 @@ public class Network {
 			for (OD od: m.values()) { // For each OD-pair; "minos" works on the OD-level
 				DCounter++;
 				System.out.print("     Destination #" + DCounter + " of " + m.size() + " is being processed.");
-				dijkstraMinPriorityQueue(this.getNode(od.D));
-				Path path = shortestPath(new OD(od.D,od.O,od.demand));
-				tolerance = path.updateCost() * maximumCostRatio;
-				System.out.println(" Maximum cost is " + tolerance + ".");
+			//	dijkstraMinPriorityQueue(this.getNode(od.D));
+			//	Path path = shortestPath(new OD(od.D,od.O,od.demand));
+				tolerance = dijkstraDists.get(od.D).get(od.O) * maximumCostRatio;
+				System.out.print(" Maximum cost is " + tolerance + ".");
+				System.out.print(" Total n.o. paths: " + totalNumberOfPaths);
+				System.out.println(" Total n.o. nodes in paths: " + totalNumberOfNodesInPaths);
 				od.R = new ArrayList<Path>();
 				currentPath = new int[1];
 				u = od.O; // Recursion starts in the origin node
@@ -603,7 +628,7 @@ public class Network {
 				Arrays.fill(unvisited, true);
 				unvisited[u - 1] = false; // Origin node starts out as visited
 
-				minos(od, u, currentPath, lengthOfCurrentPath, unvisited, tolerance);
+				minos(od, u, currentPath, lengthOfCurrentPath, unvisited);
 			}
 		}
 		//		updateUniversalDeltas(); // Updates "deltaUniversal" for use in Pathsize
@@ -838,7 +863,7 @@ public class Network {
 	 * @param unvisited an array such that unvisited[i] is true if node i
 	 * has not yet been visited
 	 */
-	private void minos(OD od, int u, int[] currentPath, double lengthOfCurrentPath, boolean[] unvisited, double tolerance) {
+	private void minos(OD od, int u, int[] currentPath, double lengthOfCurrentPath, boolean[] unvisited) {
 		// Recursive function to enumerate and save all acyclic paths.
 		for (int v : this.getNode(u).getNeighbours()) {
 			if (v == od.D) {// Base case: The considered node is the
@@ -850,8 +875,22 @@ public class Network {
 				newNodeSeq[newNodeSeq.length - 1] = v;
 
 				this.addPathToR(od, newNodeSeq); // add path to R
-			} else if (unvisited[v - 1] && lengthOfCurrentPath + nodes.get(v).dijkstraDist <= tolerance) { // Else, find all acyclic routes from
+				totalNumberOfPaths++;
+				totalNumberOfNodesInPaths += newNodeSeq.length;
+			} else if (unvisited[v - 1] && lengthOfCurrentPath + dijkstraDists.get(od.D).get(v) <= tolerance) { // Else, find all acyclic routes from
 				// unvisited neighbours
+				
+				//check if valid with regards to subtours.
+				double lengthOfSubtour = edgesNodePair.get(currentPath[currentPath.length-1]).get(v).getGenCost();
+				if(lengthOfSubtour <= dijkstraDists.get(v).get(currentPath[currentPath.length-1]) * localMaximumCostRatio){
+					for(int i = currentPath.length  - 2; i >= 0; i--){
+						lengthOfSubtour += edgesNodePair.get(currentPath[i]).get(currentPath[i+1]).getGenCost();
+						if( lengthOfSubtour > dijkstraDists.get(v).get(currentPath[i]) * localMaximumCostRatio ){
+							return;
+						}
+					}
+				} else return;
+				
 				double lengthOfNewCurrentPath = lengthOfCurrentPath + edgesNodePair.get(u).get(v).getGenCost();
 				
 				int[] newCurrentPath = new int[currentPath.length + 1];
@@ -868,9 +907,11 @@ public class Network {
 				}
 				newUnvisited[v - 1] = false;
 
-				minos(od, v, newCurrentPath, lengthOfNewCurrentPath, newUnvisited, tolerance);
+				minos(od, v, newCurrentPath, lengthOfNewCurrentPath, newUnvisited);
 			}
 		}
+		currentPath = null;
+		unvisited = null;
 		return;
 	}
 
@@ -1477,6 +1518,10 @@ public class Network {
 		}
 	}
 
+	
+	public void setLocalMaximumCostRatio(double maximumCostRatio){
+		this.localMaximumCostRatio = maximumCostRatio;
+	}
 	
 	public void setMaximumCostRatio(double maximumCostRatio){
 		this.maximumCostRatio = maximumCostRatio;
