@@ -7,7 +7,7 @@ import refCostFun.*;
 public class test {
 
 	public static void main(String[] args) {
-		
+		/// madsp did something here :O
 		String publicNetworkDirFromCalc = "//tsclient/O/Public/DMC/temp/Mads Paulsen (Network)/TransportationNetworks-master/";
 		String publicNetworkDirFromPC = "O:/Public/DMC/temp/Mads Paulsen (Network)/TransportationNetworks-master/";
 		String localNetworkDir = "C:/Projekter/Programming/Java/TransportationNetworks-master/";
