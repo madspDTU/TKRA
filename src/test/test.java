@@ -14,10 +14,10 @@ public class test {
 
 		String networkDirectory = localNetworkDir; //Define directory of networks
 		
-	//	String networkName = "SiouxFalls"; //Choose network
-		String networkName = "Anaheim";
+		String networkName = "SiouxFalls"; //Choose network
+	//	String networkName = "Anaheim";
 //		String networkName = "Berlin-Friedrichshain"; //Choose network
-		double maximumCostRatio = 1.4;
+		double maximumCostRatio = 500;
 		double localMaximumCostRatio = 2;
 		
 		Network network = new Network(networkDirectory + networkName); //Initialize network

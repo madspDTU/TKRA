@@ -135,7 +135,7 @@ public class Network {
 	 * choice set is correctly stored in OD.R, but is is clumsy 
 	 * and should maybe be implemented differently.
 	 */
-	private boolean isPseudoUniversalChoiceSetGenerated = false;
+	private boolean areInitialRestrictedChoiceSetsGenerated = false;
 	private int numOD = 0;
 
 	/**
@@ -197,16 +197,16 @@ public class Network {
 
 	/**
 	 * Constructs a new path object and adds it
-	 * to the universal choice set.
+	 * to the restricted choice set.
 	 * 
 	 * @param od the OD relation of the path to be added
 	 * @param newNodeSeq the node sequence of the path to be added
 	 * as an array of integers
-	 * @see Network#generatePseudoUniversalChoiceSet()
+	 * @see Network#generateInitialRestrictedChoiceSets()
 	 */
-	private void addPathToR(OD od, int[] newNodeSeq) {
+	private void addPathToRestrictedChoiceSet(OD od, int[] newNodeSeq) {
 		Path addThisPath = new Path(nodeSeqAsEdgeList(newNodeSeq),od);
-		od.R.add(addThisPath);
+		od.restrictedChoiceSet.add(addThisPath);
 	}
 
 	/**
@@ -358,7 +358,7 @@ public class Network {
 
 				}
 			}
-			isPseudoUniversalChoiceSetGenerated = false;
+			areInitialRestrictedChoiceSetsGenerated = false;
 			return;
 		}//else
 
@@ -614,14 +614,14 @@ public class Network {
 	
 	
 	/** 
-	 * Fills out the pseudo-universal choice sets
+	 * Fills out the intial restricted choice sets
 	 * by calling the recursive function {@code minos} for all 
 	 * OD relations. A locally and globally constrained path
 	 * enumeration is used to produce the choice sets.
 	 */
-	public void generatePseudoUniversalChoiceSet() {
-		if (isPseudoUniversalChoiceSetGenerated) return;
-		System.out.println("Generating universal choice set...");
+	public void generateInitialRestrictedChoiceSets() {
+		if (areInitialRestrictedChoiceSetsGenerated) return;
+		System.out.println("Generating initial restricted choice set...");
 		int u;
 		int[] currentPath;
 		double lengthOfCurrentPath;
@@ -642,7 +642,7 @@ public class Network {
 				System.out.print(" Total n.o. paths: " + totalNumberOfPaths);
 				System.out.println(" Total n.o. nodes in paths: " + totalNumberOfNodesInPaths);
 				
-				od.R = new ArrayList<Path>();
+				od.restrictedChoiceSet = new ArrayList<Path>();
 				currentPath = new int[1];
 				u = od.O; // Recursion starts in the origin node
 				currentPath[0] = u;
@@ -659,7 +659,7 @@ public class Network {
 		// Factor calculation
 		System.out.println((System.currentTimeMillis() - start)/1000d);
 		System.out.println("Universal choice set successfully generated.");
-		isPseudoUniversalChoiceSetGenerated = true;
+		areInitialRestrictedChoiceSetsGenerated = true;
 	}
 
 	/**
@@ -898,7 +898,7 @@ public class Network {
 				}
 				newNodeSeq[newNodeSeq.length - 1] = v;
 
-				this.addPathToR(od, newNodeSeq); // add path to R
+				this.addPathToRestrictedChoiceSet(od, newNodeSeq); // add path to R
 				totalNumberOfPaths++;
 				totalNumberOfNodesInPaths += newNodeSeq.length;
 			} else if (unvisited[v - 1] && lengthOfCurrentPath + dijkstraDists.get(od.D).get(v) <= maximumToleratedPathCostFromOtoD) { // Else, find all acyclic routes from
@@ -1788,7 +1788,7 @@ public class Network {
 	 * sum of generalized costs of the edges that
 	 * constitute them.
 	 */
-	private void updateUniversalChoiceSetCosts() {
+	public void updateUniversalChoiceSetCosts() {
 		for (HashMap<Integer, OD> m: ods.values()) {
 			for (OD od: m.values()) { // For each OD-pair
 				for (Path path : od.R) {
@@ -1802,7 +1802,7 @@ public class Network {
 	 * Writes the universal choice set;
 	 * requires it to be generated. 
 	 * 
-	 * @see Network#generatePseudoUniversalChoiceSet()
+	 * @see Network#generateInitialRestrictedChoiceSets()
 	 * @param filename the name of the file to
 	 * output to, as a string
 	 */
