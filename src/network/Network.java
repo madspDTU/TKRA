@@ -48,9 +48,6 @@ import refCostFun.RefCostFun;
  * @see RouteChoiceModel
  */
 public class Network {
-
-	public HashMap<Integer,HashMap<Integer,Integer>> dijkstraPrevs = new HashMap<Integer,HashMap<Integer,Integer>>();
-	public HashMap<Integer,HashMap<Integer,Double>> dijkstraDists = new HashMap<Integer,HashMap<Integer,Double>>();
 	
 	public String delim = ";";
 	public long  totalNumberOfPaths = 0;
@@ -63,6 +60,31 @@ public class Network {
 	 * Name of the network.
 	 */
 	private String networkName;
+	
+	/**  
+	 * For valid paths the distance between two nodes,
+	 * can at most be localMaximumCostRatio larger than
+	 * the shortest path between these two nodes.
+	 * @see Network#setLocalMaximumCostRatio(double)
+	 */
+	private double localMaximumCostRatio;
+	
+	/**  
+	 * For a shortest path tree of any node in the network,
+	 * for all other nodes the id of the previous node in
+	 * the shortest path to the destination is stored in
+	 * this HashMap.
+	 * @see Network#generateAllShortestPathTrees()
+	 */
+	public HashMap<Integer,HashMap<Integer,Integer>> dijkstraPrevs = new HashMap<Integer,HashMap<Integer,Integer>>();
+	
+	/**  
+	 * For a shortest path tree of any node in the network,
+	 * the shortest distance from all other nodes is stored
+	 * in this HashMap.
+	 * @see Network#generateAllShortestPathTrees()
+	 */
+	public HashMap<Integer,HashMap<Integer,Double>> dijkstraDists = new HashMap<Integer,HashMap<Integer,Double>>();
 
 	public double minimumFlowToBeConsideredUsed = 0;
 
@@ -113,7 +135,7 @@ public class Network {
 	 * choice set is correctly stored in OD.R, but is is clumsy 
 	 * and should maybe be implemented differently.
 	 */
-	private boolean isUniversalChoiceSetGenerated = false;
+	private boolean isPseudoUniversalChoiceSetGenerated = false;
 	private int numOD = 0;
 
 	/**
@@ -180,7 +202,7 @@ public class Network {
 	 * @param od the OD relation of the path to be added
 	 * @param newNodeSeq the node sequence of the path to be added
 	 * as an array of integers
-	 * @see Network#generateUniversalChoiceSet()
+	 * @see Network#generatePseudoUniversalChoiceSet()
 	 */
 	private void addPathToR(OD od, int[] newNodeSeq) {
 		Path addThisPath = new Path(nodeSeqAsEdgeList(newNodeSeq),od);
@@ -336,7 +358,7 @@ public class Network {
 
 				}
 			}
-			isUniversalChoiceSetGenerated = false;
+			isPseudoUniversalChoiceSetGenerated = false;
 			return;
 		}//else
 
@@ -577,26 +599,28 @@ public class Network {
 		drawNode(this.getNode(path.getD()), circleRadius);
 	}
 
-	/** 
-	 * Fills out the universal choice sets (acyclic routes only)
-	 * by calling the recursive function {@code minos} for all 
-	 * OD relations. This is done by brute force; not that the problem
-	 * is inherently NP-hard and has a non-polynomial complexity. This means
-	 * that the user should not expect this method to function on even
-	 * medium-size networks.
-	 */
-
-	double tolerance;
-	private double localMaximumCostRatio;
 	
+	/** 
+	 * Generates the shortest path tree for every
+	 * node of the network. In each of these cases
+	 * the distance all other nodes is stored in
+	 * @param dijkstraDists
+	 */
 	public void generateAllShortestPathTrees(){
 		for (Node origin : nodes.values()){
 			dijkstraMinPriorityQueueWithStorage(origin);
 		}
 	}
 	
-	public void generateUniversalChoiceSet() {
-		if (isUniversalChoiceSetGenerated) return;
+	
+	/** 
+	 * Fills out the pseudo-universal choice sets
+	 * by calling the recursive function {@code minos} for all 
+	 * OD relations. A locally and globally constrained path
+	 * enumeration is used to produce the choice sets.
+	 */
+	public void generatePseudoUniversalChoiceSet() {
+		if (isPseudoUniversalChoiceSetGenerated) return;
 		System.out.println("Generating universal choice set...");
 		int u;
 		int[] currentPath;
@@ -611,13 +635,13 @@ public class Network {
 			int DCounter = 0;
 			for (OD od: m.values()) { // For each OD-pair; "minos" works on the OD-level
 				DCounter++;
+				double maximumToleratedPathCostFromOtoD = dijkstraDists.get(od.D).get(od.O) * maximumCostRatio;
+				
 				System.out.print("     Destination #" + DCounter + " of " + m.size() + " is being processed.");
-			//	dijkstraMinPriorityQueue(this.getNode(od.D));
-			//	Path path = shortestPath(new OD(od.D,od.O,od.demand));
-				tolerance = dijkstraDists.get(od.D).get(od.O) * maximumCostRatio;
-				System.out.print(" Maximum cost is " + tolerance + ".");
+				System.out.print(" Maximum cost is " + maximumToleratedPathCostFromOtoD + ".");
 				System.out.print(" Total n.o. paths: " + totalNumberOfPaths);
 				System.out.println(" Total n.o. nodes in paths: " + totalNumberOfNodesInPaths);
+				
 				od.R = new ArrayList<Path>();
 				currentPath = new int[1];
 				u = od.O; // Recursion starts in the origin node
@@ -628,14 +652,14 @@ public class Network {
 				Arrays.fill(unvisited, true);
 				unvisited[u - 1] = false; // Origin node starts out as visited
 
-				minos(od, u, currentPath, lengthOfCurrentPath, unvisited);
+				minos(od, u, currentPath, lengthOfCurrentPath, unvisited, maximumToleratedPathCostFromOtoD);
 			}
 		}
 		//		updateUniversalDeltas(); // Updates "deltaUniversal" for use in Pathsize
 		// Factor calculation
 		System.out.println((System.currentTimeMillis() - start)/1000d);
 		System.out.println("Universal choice set successfully generated.");
-		isUniversalChoiceSetGenerated = true;
+		isPseudoUniversalChoiceSetGenerated = true;
 	}
 
 	/**
@@ -863,7 +887,7 @@ public class Network {
 	 * @param unvisited an array such that unvisited[i] is true if node i
 	 * has not yet been visited
 	 */
-	private void minos(OD od, int u, int[] currentPath, double lengthOfCurrentPath, boolean[] unvisited) {
+	private void minos(OD od, int u, int[] currentPath, double lengthOfCurrentPath, boolean[] unvisited, double maximumToleratedPathCostFromOtoD) {
 		// Recursive function to enumerate and save all acyclic paths.
 		for (int v : this.getNode(u).getNeighbours()) {
 			if (v == od.D) {// Base case: The considered node is the
@@ -877,10 +901,12 @@ public class Network {
 				this.addPathToR(od, newNodeSeq); // add path to R
 				totalNumberOfPaths++;
 				totalNumberOfNodesInPaths += newNodeSeq.length;
-			} else if (unvisited[v - 1] && lengthOfCurrentPath + dijkstraDists.get(od.D).get(v) <= tolerance) { // Else, find all acyclic routes from
+			} else if (unvisited[v - 1] && lengthOfCurrentPath + dijkstraDists.get(od.D).get(v) <= maximumToleratedPathCostFromOtoD) { // Else, find all acyclic routes from
 				// unvisited neighbours
 				
-				//check if valid with regards to subtours.
+				/* Although the path does not violate the global cost criterion, it might violate a local cost criterion.
+				   Since this is tested every time the path is expanded, it only needs to be checked for the subtours from any of the existing nodes to the new node.
+				   If the criterion is violated for any of the subtours, the path is discontinues. */
 				double lengthOfSubtour = edgesNodePair.get(currentPath[currentPath.length-1]).get(v).getGenCost();
 				if(lengthOfSubtour <= dijkstraDists.get(v).get(currentPath[currentPath.length-1]) * localMaximumCostRatio){
 					for(int i = currentPath.length  - 2; i >= 0; i--){
@@ -907,11 +933,9 @@ public class Network {
 				}
 				newUnvisited[v - 1] = false;
 
-				minos(od, v, newCurrentPath, lengthOfNewCurrentPath, newUnvisited);
+				minos(od, v, newCurrentPath, lengthOfNewCurrentPath, newUnvisited, maximumToleratedPathCostFromOtoD);
 			}
 		}
-		currentPath = null;
-		unvisited = null;
 		return;
 	}
 
@@ -1519,10 +1543,19 @@ public class Network {
 	}
 
 	
+	/**
+	 * Sets the 
+	 * @param localMaximumCostRatio
+	 */
 	public void setLocalMaximumCostRatio(double maximumCostRatio){
 		this.localMaximumCostRatio = maximumCostRatio;
 	}
 	
+	
+	/**
+	 * Sets the 
+	 * @param maximumCostRatio
+	 */
 	public void setMaximumCostRatio(double maximumCostRatio){
 		this.maximumCostRatio = maximumCostRatio;
 	}
@@ -1769,7 +1802,7 @@ public class Network {
 	 * Writes the universal choice set;
 	 * requires it to be generated. 
 	 * 
-	 * @see Network#generateUniversalChoiceSet()
+	 * @see Network#generatePseudoUniversalChoiceSet()
 	 * @param filename the name of the file to
 	 * output to, as a string
 	 */
