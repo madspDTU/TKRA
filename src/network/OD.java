@@ -33,7 +33,7 @@ public class OD{
 	
 	/**
 	 * Universal choice set (or master choice set), generated 
-	 * by calling {@link Network#generateInitialRestrictedChoiceSets()}.
+	 * by calling {@link Network#generateUniversalChoiceSets()}.
 	 */
 	ArrayList<Path> R;
 	
@@ -88,7 +88,7 @@ public class OD{
 	 * Adds a path to the universal choice set.
 	 * 
 	 * @param path the path to be added
-	 * @see Network#generateInitialRestrictedChoiceSets()
+	 * @see Network#generateUniversalChoiceSets()
 	 */
 	public void addPathR(Path path){
 		this.R.add(path);

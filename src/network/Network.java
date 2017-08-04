@@ -135,7 +135,7 @@ public class Network {
 	 * choice set is correctly stored in OD.R, but is is clumsy 
 	 * and should maybe be implemented differently.
 	 */
-	private boolean areInitialRestrictedChoiceSetsGenerated = false;
+	private boolean isUniversalChoiceSetGenerated = false;
 	private int numOD = 0;
 
 	/**
@@ -202,11 +202,11 @@ public class Network {
 	 * @param od the OD relation of the path to be added
 	 * @param newNodeSeq the node sequence of the path to be added
 	 * as an array of integers
-	 * @see Network#generateInitialRestrictedChoiceSets()
+	 * @see Network#generateUniversalChoiceSets()
 	 */
-	private void addPathToRestrictedChoiceSet(OD od, int[] newNodeSeq) {
+	private void addPathToUniversalChoiceSet(OD od, int[] newNodeSeq) {
 		Path addThisPath = new Path(nodeSeqAsEdgeList(newNodeSeq),od);
-		od.restrictedChoiceSet.add(addThisPath);
+		od.R.add(addThisPath);
 	}
 
 	/**
@@ -358,7 +358,7 @@ public class Network {
 
 				}
 			}
-			areInitialRestrictedChoiceSetsGenerated = false;
+			isUniversalChoiceSetGenerated = false;
 			return;
 		}//else
 
@@ -619,9 +619,9 @@ public class Network {
 	 * OD relations. A locally and globally constrained path
 	 * enumeration is used to produce the choice sets.
 	 */
-	public void generateInitialRestrictedChoiceSets() {
-		if (areInitialRestrictedChoiceSetsGenerated) return;
-		System.out.println("Generating initial restricted choice set...");
+	public void generateUniversalChoiceSets() {
+		if (isUniversalChoiceSetGenerated) return;
+		System.out.println("Generating universal choice set...");
 		int u;
 		int[] currentPath;
 		double lengthOfCurrentPath;
@@ -642,7 +642,7 @@ public class Network {
 				System.out.print(" Total n.o. paths: " + totalNumberOfPaths);
 				System.out.println(" Total n.o. nodes in paths: " + totalNumberOfNodesInPaths);
 				
-				od.restrictedChoiceSet = new ArrayList<Path>();
+				od.R = new ArrayList<Path>();
 				currentPath = new int[1];
 				u = od.O; // Recursion starts in the origin node
 				currentPath[0] = u;
@@ -659,7 +659,7 @@ public class Network {
 		// Factor calculation
 		System.out.println((System.currentTimeMillis() - start)/1000d);
 		System.out.println("Universal choice set successfully generated.");
-		areInitialRestrictedChoiceSetsGenerated = true;
+		isUniversalChoiceSetGenerated = true;
 	}
 
 	/**
@@ -898,7 +898,7 @@ public class Network {
 				}
 				newNodeSeq[newNodeSeq.length - 1] = v;
 
-				this.addPathToRestrictedChoiceSet(od, newNodeSeq); // add path to R
+				this.addPathToUniversalChoiceSet(od, newNodeSeq); // add path to R
 				totalNumberOfPaths++;
 				totalNumberOfNodesInPaths += newNodeSeq.length;
 			} else if (unvisited[v - 1] && lengthOfCurrentPath + dijkstraDists.get(od.D).get(v) <= maximumToleratedPathCostFromOtoD) { // Else, find all acyclic routes from
@@ -908,14 +908,17 @@ public class Network {
 				   Since this is tested every time the path is expanded, it only needs to be checked for the subtours from any of the existing nodes to the new node.
 				   If the criterion is violated for any of the subtours, the path is discontinues. */
 				double lengthOfSubtour = edgesNodePair.get(currentPath[currentPath.length-1]).get(v).getGenCost();
+				boolean longerThanLocalConstraint = false;
 				if(lengthOfSubtour <= dijkstraDists.get(v).get(currentPath[currentPath.length-1]) * localMaximumCostRatio){
 					for(int i = currentPath.length  - 2; i >= 0; i--){
 						lengthOfSubtour += edgesNodePair.get(currentPath[i]).get(currentPath[i+1]).getGenCost();
 						if( lengthOfSubtour > dijkstraDists.get(v).get(currentPath[i]) * localMaximumCostRatio ){
-							return;
+							longerThanLocalConstraint = true;
+							break;
 						}
 					}
-				} else return;
+				} else longerThanLocalConstraint= true;
+				if(longerThanLocalConstraint) continue;
 				
 				double lengthOfNewCurrentPath = lengthOfCurrentPath + edgesNodePair.get(u).get(v).getGenCost();
 				
@@ -1802,7 +1805,7 @@ public class Network {
 	 * Writes the universal choice set;
 	 * requires it to be generated. 
 	 * 
-	 * @see Network#generateInitialRestrictedChoiceSets()
+	 * @see Network#generateUniversalChoiceSets()
 	 * @param filename the name of the file to
 	 * output to, as a string
 	 */

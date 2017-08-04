@@ -270,10 +270,10 @@ public class RSUET extends RouteChoiceModel {
 		int mnl = getDToUseInUniversalChoiceSetAlg();
 
 		//if the universal choice set is not generated, do it now.
-		network.generateInitialRestrictedChoiceSets();
+		network.generateUniversalChoiceSets();
 
 		//Heuristically "cut" universal choice sets down to a more manageable size
-		//network.cutUniversalChoiceSets(maximumCostRatio);    //madsp: Should not be used, when constrained enumeration is used for creating the "universal" choice set.
+		network.cutUniversalChoiceSets(maximumCostRatio);  
 		
 		network.updatePathCosts();
 
