@@ -920,7 +920,7 @@ public class Network {
 							return;
 						}
 					}
-				} else return;
+				} else return;  
 				
 				double lengthOfNewCurrentPath = lengthOfCurrentPath + edgesNodePair.get(u).get(v).getGenCost();
 				
