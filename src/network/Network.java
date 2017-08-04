@@ -921,7 +921,7 @@ public class Network {
 							longerThanLocalConstraint = true;
 							break;
 						}
-					}
+					}   
 				} else longerThanLocalConstraint = true; 
 				if(longerThanLocalConstraint)  continue;
 				
