@@ -922,7 +922,7 @@ public class Network {
 							break;
 						}
 					}
-				} else longerThanLocalConstraint = true;
+				} else longerThanLocalConstraint = true; 
 				if(longerThanLocalConstraint) continue;
 				
 				double lengthOfNewCurrentPath = lengthOfCurrentPath + edgesNodePair.get(u).get(v).getGenCost();
