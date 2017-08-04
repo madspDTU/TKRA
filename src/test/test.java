@@ -8,17 +8,17 @@ public class test {
 
 	public static void main(String[] args) {
 		/// madsp did something here :O
-		String publicNetworkDirFromCalc = "//tsclient/O/Public/DMC/temp/Mads Paulsen (Network)/TransportationNetworks-master/";
+		String publicNetworkDirFromCalc = "O:/Public/DMC/temp/Mads Paulsen (Network)/TransportationNetworks-master/";
 		String publicNetworkDirFromPC = "O:/Public/DMC/temp/Mads Paulsen (Network)/TransportationNetworks-master/";
 		String localNetworkDir = "C:/Projekter/Programming/Java/TransportationNetworks-master/";
 
-		String networkDirectory = localNetworkDir; //Define directory of networks
+		String networkDirectory = publicNetworkDirFromCalc; //Define directory of networks
 		
-		String networkName = "SiouxFalls"; //Choose network
-	//	String networkName = "Anaheim";
+	//	String networkName = "SiouxFalls"; //Choose network
+		String networkName = "Anaheim";
 //		String networkName = "Berlin-Friedrichshain"; //Choose network
-		double maximumCostRatio = 500;
-		double localMaximumCostRatio = 2;
+		double maximumCostRatio = 2;
+		double localMaximumCostRatio = 3;
 		
 		Network network = new Network(networkDirectory + networkName); //Initialize network
 		network.setMaximumCostRatio(maximumCostRatio);

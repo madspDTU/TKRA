@@ -629,6 +629,7 @@ public class Network {
 		int numNodes = getNumNodes();
 		generateAllShortestPathTrees();
 		long start = System.currentTimeMillis();
+		long tempTimer = System.currentTimeMillis();
 		for (HashMap<Integer, OD> m: ods.values()) {
 			OCounter++;
 			System.out.println("Origin #" + OCounter + " of " + ods.size() + " is being processed.");
@@ -639,8 +640,6 @@ public class Network {
 				
 				System.out.print("     Destination #" + DCounter + " of " + m.size() + " is being processed.");
 				System.out.print(" Maximum cost is " + maximumToleratedPathCostFromOtoD + ".");
-				System.out.print(" Total n.o. paths: " + totalNumberOfPaths);
-				System.out.println(" Total n.o. nodes in paths: " + totalNumberOfNodesInPaths);
 				
 				od.R = new ArrayList<Path>();
 				currentPath = new int[1];
@@ -653,6 +652,12 @@ public class Network {
 				unvisited[u - 1] = false; // Origin node starts out as visited
 
 				minos(od, u, currentPath, lengthOfCurrentPath, unvisited, maximumToleratedPathCostFromOtoD);
+				
+				System.out.print(" Total n.o. paths: " + totalNumberOfPaths);
+				System.out.println(" Total n.o. nodes in paths: " + totalNumberOfNodesInPaths + ". Calculation time OD: " + (System.currentTimeMillis() - tempTimer)/1000d);
+
+				System.out.println(". Free memory (mb): " + Runtime.getRuntime().freeMemory()/1048576  + ".");
+				tempTimer = System.currentTimeMillis();
 			}
 		}
 		//		updateUniversalDeltas(); // Updates "deltaUniversal" for use in Pathsize
