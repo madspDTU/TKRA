@@ -923,14 +923,14 @@ public class Network {
 						}
 					}
 				} else longerThanLocalConstraint = true; 
-				if(longerThanLocalConstraint) continue;
+				if(longerThanLocalConstraint)  continue;
 				
 				double lengthOfNewCurrentPath = lengthOfCurrentPath + edgesNodePair.get(u).get(v).getGenCost();
 				
 				int[] newCurrentPath = new int[currentPath.length + 1];
 				//a deepcopy is required here to avoid paths being modified 
 				//		from other recursions
-				for (int i = 0; i < currentPath.length; i++) {
+				for (int i = 0; i < currentPath.length;  i++) {
 					newCurrentPath[i] = currentPath[i];
 				}
 				newCurrentPath[newCurrentPath.length - 1] = v;
