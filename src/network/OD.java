@@ -2,6 +2,7 @@ package network;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 
 import choiceModel.RUM;
 
@@ -88,7 +89,7 @@ public class OD{
 	 * Adds a path to the universal choice set.
 	 * 
 	 * @param path the path to be added
-	 * @see Network#generateInitialRestrictedChoiceSets()
+	 * @see Network#generateUniversalChoiceSets()
 	 */
 	public void addPathR(Path path){
 		this.R.add(path);

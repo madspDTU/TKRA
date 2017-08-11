@@ -2,6 +2,7 @@ package choiceModel;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -255,8 +256,9 @@ public class RSUET extends RouteChoiceModel {
 	 * parameters to the TMNL.
 	 *  @param network the network to solve
 	 *  @return convergence pattern, with two unused gap measures: above and below
+	 * @throws IOException 
 	 */
-	private ConvergencePattern cutUniversalChoiceSetAlgorithm(Network network) {
+	private ConvergencePattern cutUniversalChoiceSetAlgorithm(Network network) throws IOException {
 		boolean doRSUET = true;
 		//TODO workaround: Avoid doing all-or-nothing if transformed costs would be enormous
 		if (rum.theta >= 0.75 && rum instanceof TMNL) doRSUET = false;
@@ -270,10 +272,13 @@ public class RSUET extends RouteChoiceModel {
 		int mnl = getDToUseInUniversalChoiceSetAlg();
 
 		//if the universal choice set is not generated, do it now.
-		network.generateInitialRestrictedChoiceSets();
+		network.generateUniversalChoiceSets();
+		network.universalChoiceSetsStored = true;
+		
+		
 
 		//Heuristically "cut" universal choice sets down to a more manageable size
-		//network.cutUniversalChoiceSets(maximumCostRatio);    //madsp: Should not be used, when constrained enumeration is used for creating the "universal" choice set.
+		network.cutUniversalChoiceSets(maximumCostRatio);    //madsp: Should not be used, when constrained enumeration is used for creating the "universal" choice set.
 		
 		network.updatePathCosts();
 
@@ -523,6 +528,13 @@ public class RSUET extends RouteChoiceModel {
 	public void redistributeFlowOnMarkedRoutesAccordingToProbability(Network network,int maxNumberOfPathsToRemove) {
 		for (HashMap<Integer,OD> m: network.ods.values()) { //for each OD
 			for (OD od: m.values()) {
+				/*if( network.useLocalStorage ){
+					try {
+						network.loadUniversalChoiceSetFromStorage(od);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}*/
 				if (od.pathWasRemovedDuringLastIteration) {
 					od.pathWasRemovedDuringLastIteration = false;
 					continue;
@@ -550,7 +562,6 @@ public class RSUET extends RouteChoiceModel {
 					} else {
 						path.setFlow(path.getFlow()+path.p/usedPathProbabilityMass*totalFlowToRedistribute);
 					}
-
 				}
 			}
 		}
@@ -703,7 +714,7 @@ public class RSUET extends RouteChoiceModel {
 	}
 
 	@Override
-	public ConvergencePattern solve(Network network) {
+	public ConvergencePattern solve(Network network) throws IOException {
 		if (phi instanceof RefCostMin) return columnGenerationAlgorithm(network);
 		else {
 			return cutUniversalChoiceSetAlgorithm(network);

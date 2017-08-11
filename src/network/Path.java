@@ -231,7 +231,7 @@ public class Path implements Comparable<Path>{
 	public double updateCost(){
 		double genCost = 0;
 		for (Edge edge: edges) {
-			genCost += edge.getGenCost();
+			genCost += edge.getGenCost(); // when uselocalstorage, sometimes  edges have gencost = null
 		}
 		this.genCost = genCost;
 		return genCost;

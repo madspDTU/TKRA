@@ -1,8 +1,11 @@
 package network;
 
 import java.awt.Font;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.text.DateFormat;
@@ -48,19 +51,38 @@ import refCostFun.RefCostFun;
  * @see RouteChoiceModel
  */
 public class Network {
-	
-	public String delim = ";";
+
+	public char delim = ';';
 	public long  totalNumberOfPaths = 0;
 	public long  totalNumberOfNodesInPaths = 0;
 	public int OCounter = 0;
 	public double maximumCostRatio = 50;
+	public boolean universalChoiceSetsStored = false;
+	public boolean isNetworkBidirectional;
+	public boolean printStatusOnTheGo;
+
+
+	public Boolean useLocalStorage;
+	private String localStorageDirectory;
+
+	public void setLocalStorageDirectory(String localStorageDirectory){
+		this.localStorageDirectory = localStorageDirectory;
+	}
+
+	public void setIsNetworkBirectional(boolean isNetworkBirectional){
+		this.isNetworkBidirectional = isNetworkBirectional;
+	}
+
+	public void setUseLocalStorage(Boolean useLocalStorage){
+		this.useLocalStorage = useLocalStorage;
+	}
 
 
 	/**  
 	 * Name of the network.
 	 */
 	private String networkName;
-	
+
 	/**  
 	 * For valid paths the distance between two nodes,
 	 * can at most be localMaximumCostRatio larger than
@@ -68,7 +90,7 @@ public class Network {
 	 * @see Network#setLocalMaximumCostRatio(double)
 	 */
 	private double localMaximumCostRatio;
-	
+
 	/**  
 	 * For a shortest path tree of any node in the network,
 	 * for all other nodes the id of the previous node in
@@ -77,7 +99,7 @@ public class Network {
 	 * @see Network#generateAllShortestPathTrees()
 	 */
 	public HashMap<Integer,HashMap<Integer,Integer>> dijkstraPrevs = new HashMap<Integer,HashMap<Integer,Integer>>();
-	
+
 	/**  
 	 * For a shortest path tree of any node in the network,
 	 * the shortest distance from all other nodes is stored
@@ -106,7 +128,7 @@ public class Network {
 	 * @see Network#getNode(int)
 	 * @see Network#edgesNodePair
 	 */
-	private Edge[] edges; // Set of edges
+	private HashMap<Integer,Edge> edges; // Set of edges
 	/**
 	 * Edges identified by their tail and head, which is not 
 	 * only preferable to having a dedicated set of edge
@@ -135,8 +157,12 @@ public class Network {
 	 * choice set is correctly stored in OD.R, but is is clumsy 
 	 * and should maybe be implemented differently.
 	 */
-	private boolean areInitialRestrictedChoiceSetsGenerated = false;
+	private boolean isUniversalChoiceSetsGenerated = false;
 	private int numOD = 0;
+
+	public Network(String folderName){
+		new Network(folderName, false);
+	}
 
 	/**
 	 * Very important constructor. This does not only read
@@ -151,7 +177,8 @@ public class Network {
 	 * the output file
 	 *
 	 */
-	public Network(String folderName) {
+	public Network(String folderName, boolean isNetworkBirectional) {
+		setIsNetworkBirectional(isNetworkBirectional);
 		networkName = folderName.substring(folderName.lastIndexOf("/") + 1).trim();
 		File file = new File(folderName);
 		if (file.isDirectory()) {
@@ -202,11 +229,11 @@ public class Network {
 	 * @param od the OD relation of the path to be added
 	 * @param newNodeSeq the node sequence of the path to be added
 	 * as an array of integers
-	 * @see Network#generateInitialRestrictedChoiceSets()
+	 * @see Network#generateUniversalChoiceSets()
 	 */
-	private void addPathToRestrictedChoiceSet(OD od, int[] newNodeSeq) {
+	private void addPathToUniversalChoiceSet(OD od, int[] newNodeSeq) {
 		Path addThisPath = new Path(nodeSeqAsEdgeList(newNodeSeq),od);
-		od.restrictedChoiceSet.add(addThisPath);
+		od.R.add(addThisPath);
 	}
 
 	/**
@@ -355,16 +382,23 @@ public class Network {
 				for (OD od: m.values()) {
 					od.restrictedChoiceSet = od.R;
 					od.R = null; //erase universal choice set for safety reasons
-
 				}
 			}
-			areInitialRestrictedChoiceSetsGenerated = false;
+			isUniversalChoiceSetsGenerated = false;
 			return;
 		}//else
 
-		sortUniversalChoiceSets();
 		for (HashMap<Integer,OD> m: ods.values()) {
 			for (OD od: m.values()) {
+				if(useLocalStorage){
+					try {
+						loadUniversalChoiceSetFromStorage(od);
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
+				Collections.sort(od.R);
 				od.setMinimumCost(od.R.get(0).genCost);
 				double maximumCost = maximumCostRatio * od.getMinimumCost();
 				od.restrictedChoiceSet = new ArrayList<Path>();
@@ -373,7 +407,14 @@ public class Network {
 						od.restrictedChoiceSet.add(path);
 					} else break;
 				}
-
+				if(useLocalStorage){
+					try {
+						transferUniversalChoiceSetToStorage(od);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+						od.R.clear();
+				}
 			}
 		}
 
@@ -414,13 +455,13 @@ public class Network {
 				if (!Qbuddy.contains(vID)) {
 					Qbuddy.add(vID);
 					Q.add(v);
-				};
+				}
 				double alt = u.dijkstraDist + this.getEdge(u,v).getGenCost(); 
 				if (alt < v.dijkstraDist) {
 					v.dijkstraDist = alt;
 					v.dijkstraPrev = u;
-					//Q.remove(v);
-					//Q.add(v);
+					//	Q.remove(v);
+					//	Q.add(v);
 					//Updating in the priority queue and sifting up is now efficiently (O(log(n))) 
 					//implemented in {@code MyMinPriorityQueue} with a hashmap by @author mesch
 					Q.updateHeapPositionUp(v);
@@ -430,7 +471,7 @@ public class Network {
 
 		return true;
 	}
-	
+
 	public void dijkstraMinPriorityQueueWithStorage(Node originNode) {
 		dijkstraMinPriorityQueue(originNode);
 		int id = originNode.getId();
@@ -482,9 +523,9 @@ public class Network {
 		Node fromNode;
 		Node toNode;
 		// Draw edges
-		for (int i = 0; i < edges.length; i++) {
-			fromNode = this.getNode(edges[i].getTail());
-			toNode = this.getNode(edges[i].getHead());
+		for (Edge edge : edges.values()) {
+			fromNode = this.getNode(edge.getTail());
+			toNode = this.getNode(edge.getHead());
 			drawEdge(fromNode, toNode, circleRadius, type);
 		}
 	}
@@ -599,28 +640,29 @@ public class Network {
 		drawNode(this.getNode(path.getD()), circleRadius);
 	}
 
-	
+
 	/** 
 	 * Generates the shortest path tree for every
 	 * node of the network. In each of these cases
-	 * the distance all other nodes is stored in
-	 * @param dijkstraDists
+	 * the distance to all other nodes is stored in
+	 * dijkstraDists
 	 */
 	public void generateAllShortestPathTrees(){
 		for (Node origin : nodes.values()){
 			dijkstraMinPriorityQueueWithStorage(origin);
 		}
 	}
-	
-	
+
+
 	/** 
 	 * Fills out the intial restricted choice sets
 	 * by calling the recursive function {@code minos} for all 
 	 * OD relations. A locally and globally constrained path
 	 * enumeration is used to produce the choice sets.
+	 * @throws IOException 
 	 */
-	public void generateInitialRestrictedChoiceSets() {
-		if (areInitialRestrictedChoiceSetsGenerated) return;
+	public void generateUniversalChoiceSets() throws IOException {
+		if (isUniversalChoiceSetsGenerated) return;
 		System.out.println("Generating initial restricted choice set...");
 		int u;
 		int[] currentPath;
@@ -636,27 +678,32 @@ public class Network {
 			int DCounter = 0;
 			for (OD od: m.values()) { // For each OD-pair; "minos" works on the OD-level
 				DCounter++;
-				double maximumToleratedPathCostFromOtoD = dijkstraDists.get(od.D).get(od.O) * maximumCostRatio;
-				
-				System.out.print("     Destination #" + DCounter + " of " + m.size() + " is being processed.");
-				System.out.print(" Maximum cost is " + maximumToleratedPathCostFromOtoD + ".");
-				
-				od.restrictedChoiceSet = new ArrayList<Path>();
+				double maximumToleratedPathCostFromOtoD = dijkstraDists.get(od.O).get(od.D) * maximumCostRatio;
+				if(printStatusOnTheGo){
+					System.out.print("     Destination #" + DCounter + " of " + m.size() + " is being processed.");
+					System.out.print(" Maximum cost is " + maximumToleratedPathCostFromOtoD + ".");
+				}
+				od.R = new ArrayList<Path>();
 				currentPath = new int[1];
 				u = od.O; // Recursion starts in the origin node
 				currentPath[0] = u;
 				lengthOfCurrentPath = 0;
-			
+
 				unvisited = new boolean[numNodes];
 				Arrays.fill(unvisited, true);
 				unvisited[u - 1] = false; // Origin node starts out as visited
-
-				minos(od, u, currentPath, lengthOfCurrentPath, unvisited, maximumToleratedPathCostFromOtoD);
 				
-				System.out.print(" Total n.o. paths: " + totalNumberOfPaths);
-				System.out.println(" Total n.o. nodes in paths: " + totalNumberOfNodesInPaths + ". Calculation time OD: " + (System.currentTimeMillis() - tempTimer)/1000d);
+				minos(od, u, currentPath, lengthOfCurrentPath, unvisited, maximumToleratedPathCostFromOtoD);
 
-				System.out.println(". Free memory (mb): " + Runtime.getRuntime().freeMemory()/1048576  + ".");
+				if(useLocalStorage){
+					transferUniversalChoiceSetToStorage(od);
+					od.R.clear();
+				}
+				if(printStatusOnTheGo){
+					System.out.print(" Total n.o. paths: " + totalNumberOfPaths);
+					System.out.print(" Total n.o. nodes in paths: " + totalNumberOfNodesInPaths + ". Calculation time OD: " + (System.currentTimeMillis() - tempTimer)/1000d);
+					System.out.println(". Free memory (mb): " + Runtime.getRuntime().freeMemory()/1048576  + "."); 
+				}
 				tempTimer = System.currentTimeMillis();
 			}
 		}
@@ -664,7 +711,72 @@ public class Network {
 		// Factor calculation
 		System.out.println((System.currentTimeMillis() - start)/1000d);
 		System.out.println("Universal choice set successfully generated.");
-		areInitialRestrictedChoiceSetsGenerated = true;
+		isUniversalChoiceSetsGenerated = true;
+	}
+
+
+	/**
+	 * Transfers the restricted choice set to the local
+	 * storage directory. This is done to reduce the
+	 * requirements of available memory.
+	 */
+	private void transferUniversalChoiceSetToStorage(OD od) throws IOException{
+		FileWriter writer = new FileWriter(localStorageDirectory + "PathsO" + od.O + "D" + od.D + ".csv");
+		for(int i = 0; i < od.R.size(); i++){
+			Path path = od.R.get(i);
+			writer.append(String.valueOf(path.getFlow()) + delim + String.valueOf(path.getAuxFlow()) + delim +
+					String.valueOf(path.length) + delim + String.valueOf(path.genCost) + delim +
+					String.valueOf(path.enumeratorInProbabilityExpression) + delim + String.valueOf(path.p) + delim +
+					String.valueOf(path.transformedCost) + delim + String.valueOf(path.PS) + delim +
+					String.valueOf(path.markedForRemoval) + delim);
+			if(!path.edges.isEmpty()){
+				for(int j = 0; j < path.edges.size() -1; j++){
+					writer.append( String.valueOf(path.edges.get(j).getId()) + delim);
+				}
+				writer.append(String.valueOf(path.edges.get(path.edges.size()-1).getId()) + "\n" );
+			}
+		}
+
+		writer.flush();
+		writer.close();
+	}
+
+
+	/**
+	 * Loads restricted choice sets from storage.
+	 */
+	public void loadUniversalChoiceSetFromStorage(OD od) throws IOException{
+		BufferedReader br = new BufferedReader(new FileReader(localStorageDirectory + "PathsO" + od.O + "D" + od.D + ".csv"));
+		String readLine;
+		while( (readLine = br.readLine()) != null){
+			Path path = new Path(new ArrayList<Edge>(), od);
+			int loadCounter = 0;
+			String tempString = "";
+			for(int i = 0; i < readLine.length(); i++){
+				char ch = readLine.charAt(i);
+				if ( ch == delim){
+					loadCounter++;
+					switch(loadCounter){
+					case 1: path.setFlow(Double.valueOf(tempString)); break;
+					case 2: path.setAuxFlow(Double.valueOf(tempString)); break;
+					case 3: path.length = Double.valueOf(tempString); break;
+					case 4: path.genCost = Double.valueOf(tempString); break;
+					case 5: path.enumeratorInProbabilityExpression = Double.valueOf(tempString); break;
+					case 6: path.p = Double.valueOf(tempString); break;
+					case 7: path.transformedCost = Double.valueOf(tempString); break;
+					case 8: path.PS = Double.valueOf(tempString); break;
+					case 9: path.markedForRemoval = Boolean.valueOf(tempString); break;
+					default: path.edges.add(getEdge(Integer.valueOf(tempString))); break;
+					}
+					tempString = "";
+				} else {
+					tempString += ch;
+				}
+			}
+			path.edges.add(getEdge(Integer.valueOf(tempString)));
+			path.updateCost();
+			od.R.add(path);
+		}
 	}
 
 	/**
@@ -676,8 +788,14 @@ public class Network {
 	 * by the order in which edges are read from the _net.tntp file.
 	 * @return the edge with ID edgeID. 
 	 */
-	public Edge getEdge(int edgeID) {
-		return edges[edgeID - 1];
+	public Edge getEdge(int edgeId){
+		if(edgeId < 0){
+			Edge edge = edges.get(-edgeId);
+			return edgesNodePair.get(edge.getHead()).get(edge.getTail());
+		} else {
+			Edge edge = edges.get(edgeId);
+			return edgesNodePair.get(edge.getTail()).get(edge.getHead());
+		} 		
 	}
 
 	/**
@@ -733,7 +851,7 @@ public class Network {
 	 * of the vector of edges.
 	 */
 	public int getNumEdges() {
-		return edges.length;
+		return edges.size();
 	}
 
 	/**
@@ -794,9 +912,9 @@ public class Network {
 		//		Add only the origin node to the priority queue
 		Q.add(originNode);
 		Qbuddy.add(originNodeID);
-	//	for (OD od : ods.get(originNodeID).values()) {
-	//		destinations.add(od.D);
-	//	}
+		//	for (OD od : ods.get(originNodeID).values()) {
+		//		destinations.add(od.D);
+		//	}
 		for(int nodeId : nodes.keySet()){
 			if(nodeId != originNode.getId()){
 				destinations.add(nodeId);
@@ -813,7 +931,7 @@ public class Network {
 	 */
 	public void loadNetwork() {
 		// Reset link counts to 0
-		for (Edge edge: edges) {
+		for (Edge edge: edges.values()) {
 			edge.setFlow(0);
 		}
 
@@ -894,7 +1012,7 @@ public class Network {
 	 */
 	private void minos(OD od, int u, int[] currentPath, double lengthOfCurrentPath, boolean[] unvisited, double maximumToleratedPathCostFromOtoD) {
 		// Recursive function to enumerate and save all acyclic paths.
-		for (int v : this.getNode(u).getNeighbours()) {
+		for (int v : this.getNode(u).getNeighbours()) {	
 			if (v == od.D) {// Base case: The considered node is the
 				// destination. Add path and cont.
 				int[] newNodeSeq = new int[currentPath.length + 1];
@@ -903,27 +1021,33 @@ public class Network {
 				}
 				newNodeSeq[newNodeSeq.length - 1] = v;
 
-				this.addPathToRestrictedChoiceSet(od, newNodeSeq); // add path to R
+				this.addPathToUniversalChoiceSet(od, newNodeSeq); // add path to R
 				totalNumberOfPaths++;
 				totalNumberOfNodesInPaths += newNodeSeq.length;
-			} else if (unvisited[v - 1] && lengthOfCurrentPath + dijkstraDists.get(od.D).get(v) <= maximumToleratedPathCostFromOtoD) { // Else, find all acyclic routes from
+			} else if (unvisited[v - 1] && lengthOfCurrentPath + dijkstraDists.get(v).get(od.D) <= maximumToleratedPathCostFromOtoD) { // Else, find all acyclic routes from
 				// unvisited neighbours
-				
+				boolean localConstraintViolated = false;
 				/* Although the path does not violate the global cost criterion, it might violate a local cost criterion.
 				   Since this is tested every time the path is expanded, it only needs to be checked for the subtours from any of the existing nodes to the new node.
 				   If the criterion is violated for any of the subtours, the path is discontinues. */
+
 				double lengthOfSubtour = edgesNodePair.get(currentPath[currentPath.length-1]).get(v).getGenCost();
-				if(lengthOfSubtour <= dijkstraDists.get(v).get(currentPath[currentPath.length-1]) * localMaximumCostRatio){
+				if(lengthOfSubtour <= dijkstraDists.get(currentPath[currentPath.length-1]).get(v) * localMaximumCostRatio){
 					for(int i = currentPath.length  - 2; i >= 0; i--){
 						lengthOfSubtour += edgesNodePair.get(currentPath[i]).get(currentPath[i+1]).getGenCost();
-						if( lengthOfSubtour > dijkstraDists.get(v).get(currentPath[i]) * localMaximumCostRatio ){
-							return;
+						if( lengthOfSubtour > dijkstraDists.get(currentPath[i]).get(v) * localMaximumCostRatio ){
+							localConstraintViolated = true;
 						}
 					}
-				} else return;
-				
+				} else {
+					localConstraintViolated = true;
+				}
+				if(localConstraintViolated){
+					continue;
+				}
+
 				double lengthOfNewCurrentPath = lengthOfCurrentPath + edgesNodePair.get(u).get(v).getGenCost();
-				
+
 				int[] newCurrentPath = new int[currentPath.length + 1];
 				//a deepcopy is required here to avoid paths being modified 
 				//		from other recursions
@@ -1095,7 +1219,7 @@ public class Network {
 		out.print(delim);
 		out.print("Time");
 		out.print("\n");
-		for (Edge edge: edges) {
+		for (Edge edge: edges.values()) {
 			out.print(edge.getId());
 			out.print(delim);
 			out.print(edge.getFlow());
@@ -1277,7 +1401,7 @@ public class Network {
 
 			}
 
-			edges = new Edge[numEdges];
+			edges = new HashMap<Integer,Edge>();
 			int edgeIndex = 0;
 			//			find the first occurence of "~"
 			boolean foundHeaderToken = false;
@@ -1298,8 +1422,7 @@ public class Network {
 				if (!dataLine.equals("")){
 					Scanner in = new Scanner(dataLine);
 					in.useLocale(Locale.ENGLISH);
-					edges[edgeIndex] = new Edge();
-					Edge thisEdge = edges[edgeIndex];
+					Edge thisEdge = new Edge();
 					thisEdge.setId(edgeIndex + 1);
 					thisEdge.setTail(in.nextInt());
 					thisEdge.setHead(in.nextInt());
@@ -1308,6 +1431,7 @@ public class Network {
 					thisEdge.setFreeFlowTime(in.nextDouble());
 					thisEdge.setB(in.nextDouble());
 					thisEdge.setPower(in.nextDouble());
+					edges.put(thisEdge.getId(),thisEdge);
 					in.close();
 					edgeIndex++;
 				}
@@ -1430,7 +1554,7 @@ public class Network {
 			// Generate neighbours
 
 			System.out.print("Finalising... ");
-			for (Edge edge: edges) {
+			for (Edge edge: edges.values()) {
 				int tail = edge.getTail();
 				int head = edge.getHead();
 				// For each edge, the head is a neighbour to the tail.
@@ -1440,6 +1564,14 @@ public class Network {
 					edgesNodePair.put(tail, new HashMap<Integer,Edge>());
 				}
 				edgesNodePair.get(tail).put(head, edge);
+
+				if(isNetworkBidirectional){
+					Edge oppositeEdge = createOppositeEdge(edge);
+					if (!edgesNodePair.containsKey(oppositeEdge.getTail())) {
+						edgesNodePair.put(head, new HashMap<Integer,Edge>());
+					}
+					edgesNodePair.get(oppositeEdge.getTail()).put(oppositeEdge.getHead(), oppositeEdge);
+				}
 			}
 
 			//Register which nodes have demand
@@ -1458,6 +1590,28 @@ public class Network {
 			e.printStackTrace();
 		}
 		System.out.println("Network successfully read.");
+	}
+
+	
+
+	
+	
+	/**
+	 * 
+	 */
+
+	private Edge createOppositeEdge(Edge edge){
+		Edge oppositeEdge = new Edge();
+		oppositeEdge.setB(edge.getB());
+		oppositeEdge.setCapacity(edge.getCapacity());
+		oppositeEdge.setFreeFlowTime(edge.getFreeFlowTime());
+		oppositeEdge.setGenCost(edge.getGenCost());
+		oppositeEdge.setHead(edge.getTail());
+		oppositeEdge.setId(-edge.getId());
+		oppositeEdge.setLength(edge.getLength());
+		oppositeEdge.setPower(edge.getPower());
+		oppositeEdge.setTail(edge.getHead());
+		return oppositeEdge;
 	}
 
 	/**
@@ -1499,7 +1653,7 @@ public class Network {
 	 * restricted choice sets to 0.
 	 */
 	public void resetNetwork() {
-		for (Edge edge : this.edges) {
+		for (Edge edge : this.edges.values()) {
 			edge.setFlow(0);
 		}
 
@@ -1547,7 +1701,7 @@ public class Network {
 		}
 	}
 
-	
+
 	/**
 	 * Sets the 
 	 * @param localMaximumCostRatio
@@ -1555,8 +1709,8 @@ public class Network {
 	public void setLocalMaximumCostRatio(double maximumCostRatio){
 		this.localMaximumCostRatio = maximumCostRatio;
 	}
-	
-	
+
+
 	/**
 	 * Sets the 
 	 * @param maximumCostRatio
@@ -1564,8 +1718,8 @@ public class Network {
 	public void setMaximumCostRatio(double maximumCostRatio){
 		this.maximumCostRatio = maximumCostRatio;
 	}
-	
-	
+
+
 	/**
 	 * Uses the predecessors of each nodes found by a dijktra's algorithm
 	 * to determine the shortest path from O to D. This method only
@@ -1669,7 +1823,8 @@ public class Network {
 		// Calculate and save pathwise-auxiliary flows
 		double denominatorInProbabilityExpression;
 		for (HashMap<Integer, OD> m: ods.values()) {
-			for (OD od: m.values()) { // For each OD-pair
+			for (OD od: m.values()) {
+				// For each OD-pair
 				// Calculate utility logsum for MNL
 				denominatorInProbabilityExpression = 0;
 				double threshold = omega.calculateRefCost(od);
@@ -1699,7 +1854,7 @@ public class Network {
 	 * (additive deterministic utility)
 	 */
 	public void updateEdgeCosts(RUM rum) {
-		for (Edge edge: edges) {
+		for (Edge edge: edges.values()) {
 			edge.updateCost(rum);
 		}
 	}
@@ -1709,6 +1864,7 @@ public class Network {
 	 * sum of generalized costs of its edges. Also updates the 
 	 * minimum cost on each OD.
 	 */
+
 	public void updatePathCosts() {
 		for (HashMap<Integer, OD> m: ods.values()) {
 			for (OD od: m.values()) { // For each OD-pair
@@ -1796,8 +1952,23 @@ public class Network {
 	public void updateUniversalChoiceSetCosts() {
 		for (HashMap<Integer, OD> m: ods.values()) {
 			for (OD od: m.values()) { // For each OD-pair
+				if(useLocalStorage){
+					try {
+						loadUniversalChoiceSetFromStorage(od);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
 				for (Path path : od.R) {
 					path.updateCost(); // costs
+				}
+				if(useLocalStorage){
+					try {
+						transferUniversalChoiceSetToStorage(od);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+					od.R.clear();
 				}
 			}
 		}

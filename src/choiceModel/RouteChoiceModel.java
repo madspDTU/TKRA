@@ -1,5 +1,7 @@
 package choiceModel;
 
+import java.io.IOException;
+
 import auxiliary.ConvergencePattern;
 import network.Network;
 import network.OD;
@@ -24,8 +26,9 @@ public abstract class RouteChoiceModel {
      * @param network the {@linkplain Network} to get to equilibrium in.
      * @return a convergence pattern that shows how the solution algorithm
      * fared
+     * @throws IOException 
      */
-    public abstract ConvergencePattern solve(Network network);
+    public abstract ConvergencePattern solve(Network network) throws IOException;
 
     protected void setRum(RUM rum2) {
 	this.rum = rum2;
