@@ -413,7 +413,7 @@ public class Network {
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
-						od.R.clear();
+					od.R.clear();
 				}
 			}
 		}
@@ -692,7 +692,7 @@ public class Network {
 				unvisited = new boolean[numNodes];
 				Arrays.fill(unvisited, true);
 				unvisited[u - 1] = false; // Origin node starts out as visited
-				
+
 				minos(od, u, currentPath, lengthOfCurrentPath, unvisited, maximumToleratedPathCostFromOtoD);
 
 				if(useLocalStorage){
@@ -1045,6 +1045,7 @@ public class Network {
 				if(localConstraintViolated){
 					continue;
 				}
+
 
 				double lengthOfNewCurrentPath = lengthOfCurrentPath + edgesNodePair.get(u).get(v).getGenCost();
 
@@ -1592,10 +1593,10 @@ public class Network {
 		System.out.println("Network successfully read.");
 	}
 
-	
 
-	
-	
+
+
+
 	/**
 	 * 
 	 */
