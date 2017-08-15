@@ -1,4 +1,4 @@
-package test;
+package multipleAssignments;
 
 import java.io.File;
 import java.io.IOException;
@@ -8,7 +8,7 @@ import auxiliary.*;
 import choiceModel.*;
 import network.*;
 import refCostFun.*;
-public class test {
+public class multipleAssignments {
 
 	public static void main(String[] args) throws IOException {
 		String publicNetworkDirFromCalc = "O:/Public/DMC/temp/Mads Paulsen (Network)/TransportationNetworks-master/";
@@ -40,29 +40,42 @@ public class test {
 		network.setLocalStorageDirectory(localStorageDirectory);
 		network.setUseLocalStorage(useLocalStorage);
 		network.printStatusOnTheGo = printStatusOnTheGo;
-
 		
-		RefCostFun phi = new RefCostTauMin(1.3); //lower reference cost in RSUET
-		RefCostFun omega = new RefCostTauMin(1.3); //upper reference cost in RSUET 
-
-		 
-//		phi = omega; // make phi = omega; this is computationally demanding. Only do it on small networks. 
-
-		RUM rum = new TMNL(omega); //TMNL random utility model -- explicitly state to use ref cost omega 
-		RSUET routeChoiceModel = new RSUET(rum, phi,omega); //set up the TMNL RSUET(min, min + 10)
-		routeChoiceModel.maximumCostRatio = maximumCostRatio;
-		routeChoiceModel.epsilon = 0.00005;
-
-
-		
-		ConvergencePattern conv = routeChoiceModel.solve(network); //get network to equilibrium
-
 		boolean printToFile = true; //specify if you want the output printed
 		String outputFolderPC = "O:/Public/DMC/temp/Mads Paulsen (Network)/Outputs";
 		String outputFolderCalc = "C:/Projekter/Programming/Java/Outputs";
 		String outputFolder = outputFolderCalc;
+
+		
+		RefCostFun phi = new RefCostTauMin(1.3); //lower reference cost in RSUET
+		RefCostFun omega = new RefCostTauMin(1.3); //upper reference cost in RSUET 
+		
+		RSUET.doInitialRSUET = 0;
+		 
+//		phi = omega; // make phi = omega; this is computationally demanding. Only do it on small networks. 
+		
+		for (double x=1;x<=2;x=x+1) {
+			System.out.print("value of x :" + x/10d);
+			System.out.print("\n");
+		
+			RUM rum = new TMNL(omega); //TMNL random utility model -- explicitly state to use ref cost omega 
+			
+			rum.theta=x/10d;
+			
+			RSUET routeChoiceModel = new RSUET(rum, phi,omega); //set up the TMNL RSUET(min, min + 10)
+			routeChoiceModel.maximumCostRatio = maximumCostRatio;
+			routeChoiceModel.epsilon = 0.00005;
+
+
+		
+		ConvergencePattern conv = routeChoiceModel.solve(network); //get network to equilibrium
+		RSUET.laterIteration=1; //Help, only do initial RSUET assignemtn in first iteration.
 		if (printToFile){
 			network.printOutput(outputFolder, routeChoiceModel, conv);
 		}
+		}
+
+
+		
 	}
 }

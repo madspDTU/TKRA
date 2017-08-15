@@ -103,6 +103,11 @@ public class RSUET extends RouteChoiceModel {
 	 * considered.
 	 */
 	public double maximumCostRatio = 8;
+	
+	
+	
+	public static int doInitialRSUET;
+	public static int laterIteration;
 
 	/**
 	 * Only class constructor, since the RSUET requires two reference costs
@@ -262,6 +267,8 @@ public class RSUET extends RouteChoiceModel {
 		boolean doRSUET = true;
 		//TODO workaround: Avoid doing all-or-nothing if transformed costs would be enormous
 		if (rum.theta >= 0.75 && rum instanceof TMNL) doRSUET = false;
+		if (doInitialRSUET == 0  && laterIteration==1) doRSUET = false;
+		
 		if (doRSUET) columnGenerationAlgorithm(network);
 
 		ConvergencePattern conv = new ConvergencePattern();
