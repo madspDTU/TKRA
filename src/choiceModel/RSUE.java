@@ -20,7 +20,7 @@ public class RSUE extends RSUET {
     public static final RefCostFun omega = new RefCostInf();
     
     public RSUE(RUM rum, RefCostFun phi) {
-	super(rum, phi, omega);
+	super(rum, phi, omega, 1);
     }
 
     @Override

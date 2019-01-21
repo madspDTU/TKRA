@@ -60,6 +60,7 @@ public class Network {
 	public boolean universalChoiceSetsStored = false;
 	public boolean isNetworkBidirectional;
 	public boolean printStatusOnTheGo;
+	public double demandScale;
 
 
 	public Boolean useLocalStorage;
@@ -161,7 +162,7 @@ public class Network {
 	private int numOD = 0;
 
 	public Network(String folderName){
-		new Network(folderName, false);
+		new Network(folderName, false, 1.0);
 	}
 
 	/**
@@ -177,8 +178,9 @@ public class Network {
 	 * the output file
 	 *
 	 */
-	public Network(String folderName, boolean isNetworkBirectional) {
+	public Network(String folderName, boolean isNetworkBirectional, double demandScale) {
 		setIsNetworkBirectional(isNetworkBirectional);
+		this.demandScale=demandScale;
 		networkName = folderName.substring(folderName.lastIndexOf("/") + 1).trim();
 		File file = new File(folderName);
 		if (file.isDirectory()) {
@@ -714,7 +716,58 @@ public class Network {
 		isUniversalChoiceSetsGenerated = true;
 	}
 
+	public void consEnum(double bound) throws IOException {
+		System.out.println("Generating constrained Enumeration Choice Set...");
+		int u;
+		int[] currentPath;
+		double lengthOfCurrentPath;
+		boolean[] unvisited;
+		int numNodes = getNumNodes();
+		generateAllShortestPathTrees();
+		long start = System.currentTimeMillis();
+		long tempTimer = System.currentTimeMillis();
+		for (HashMap<Integer, OD> m: ods.values()) {
+			OCounter++;
+			//System.out.println("Origin #" + OCounter + " of " + ods.size() + " is being processed.");
+			int DCounter = 0;
+			for (OD odReal: m.values()) { // For each OD-pair; "minos" works on the OD-level
+				OD od = new OD(odReal.O,odReal.D,odReal.demand);
+				DCounter++;
+				double maximumToleratedPathCostFromOtoD = dijkstraDists.get(od.O).get(od.D) + bound;
+				if(printStatusOnTheGo){
+					System.out.print("     Destination #" + DCounter + " of " + m.size() + " is being processed.");
+					System.out.print(" Maximum cost is " + maximumToleratedPathCostFromOtoD + ".");
+				}
+				od.R = new ArrayList<Path>();
+				currentPath = new int[1];
+				u = od.O; // Recursion starts in the origin node
+				currentPath[0] = u;
+				lengthOfCurrentPath = 0;
 
+				unvisited = new boolean[numNodes];
+				Arrays.fill(unvisited, true);
+				unvisited[u - 1] = false; // Origin node starts out as visited
+
+				minos(od, u, currentPath, lengthOfCurrentPath, unvisited, maximumToleratedPathCostFromOtoD);
+
+				if(useLocalStorage){
+					transferUniversalChoiceSetToStorage(od);
+					od.R.clear();
+				}
+				if(printStatusOnTheGo){
+					System.out.print(" Total n.o. paths: " + totalNumberOfPaths);
+					System.out.print(" Total n.o. nodes in paths: " + totalNumberOfNodesInPaths + ". Calculation time OD: " + (System.currentTimeMillis() - tempTimer)/1000d);
+					System.out.println(". Free memory (mb): " + Runtime.getRuntime().freeMemory()/1048576  + "."); 
+				}
+				tempTimer = System.currentTimeMillis();
+			}
+		}
+		//		updateUniversalDeltas(); // Updates "deltaUniversal" for use in Pathsize
+		// Factor calculation
+		System.out.println((System.currentTimeMillis() - start)/1000d);
+		System.out.println("Universal choice set successfully generated.");
+		isUniversalChoiceSetsGenerated = true;
+	}
 	/**
 	 * Transfers the restricted choice set to the local
 	 * storage directory. This is done to reduce the
@@ -741,12 +794,61 @@ public class Network {
 		writer.close();
 	}
 
+	public void exportConsideredPaths() throws IOException {
+		for (HashMap<Integer, OD> m: ods.values()) {
+			for(OD od : m.values()) {
+				exportConsideredPaths(od);
+			}
+		}
+	}
+	
+	private void exportConsideredPaths(OD od) throws IOException{
+		FileWriter writer = new FileWriter(localStorageDirectory + "PathsO" + od.O + "D" + od.D + "_Considered.csv");
+		for(int i = 0; i < od.R.size(); i++){
+			Path path = od.R.get(i);
+			if(path.getHasBeenUsed()){
+				writer.append(String.valueOf(0) + delim + String.valueOf(0) + delim +
+						String.valueOf(path.length) + delim + String.valueOf(path.genCost) + delim +
+						String.valueOf(path.enumeratorInProbabilityExpression) + delim + String.valueOf(path.p) + delim +
+						String.valueOf(path.transformedCost) + delim + String.valueOf(path.PS) + delim +
+						String.valueOf(path.markedForRemoval) + delim);
+				if(!path.edges.isEmpty()){
+					for(int j = 0; j < path.edges.size() -1; j++){
+						writer.append( String.valueOf(path.edges.get(j).getId()) + delim);
+					}
+					writer.append(String.valueOf(path.edges.get(path.edges.size()-1).getId()) + "\n" );
+				}
+			}
+		}
+		writer.flush();
+		writer.close();
+	}
 
+
+
+
+
+	public void loadUniversalChoiceSetFromStorage(OD od) throws IOException {
+		loadUniversalChoiceSetFromStorage(od,localStorageDirectory + "PathsO" + od.O + "D" + od.D + ".csv");
+	}
+	
+	public void loadConsideredPaths(OD od) throws IOException {
+		loadUniversalChoiceSetFromStorage(od,localStorageDirectory + "PathsO" + od.O + "D" + od.D + "_Considered.csv");
+	}
+	
+	public void loadConsideredPaths() throws IOException {
+		for (HashMap<Integer, OD> m: ods.values()) {
+			for(OD od : m.values()) {
+				loadConsideredPaths(od);
+			}
+		}
+	}
+	
 	/**
 	 * Loads restricted choice sets from storage.
 	 */
-	public void loadUniversalChoiceSetFromStorage(OD od) throws IOException{
-		BufferedReader br = new BufferedReader(new FileReader(localStorageDirectory + "PathsO" + od.O + "D" + od.D + ".csv"));
+	public void loadUniversalChoiceSetFromStorage(OD od, String outfile) throws IOException{
+		BufferedReader br = new BufferedReader(new FileReader(outfile));
 		String readLine;
 		while( (readLine = br.readLine()) != null){
 			Path path = new Path(new ArrayList<Edge>(), od);
@@ -1027,16 +1129,22 @@ public class Network {
 			} else if (unvisited[v - 1] && lengthOfCurrentPath + dijkstraDists.get(v).get(od.D) <= maximumToleratedPathCostFromOtoD) { // Else, find all acyclic routes from
 				// unvisited neighbours
 				boolean localConstraintViolated = false;
+				
+				
 				/* Although the path does not violate the global cost criterion, it might violate a local cost criterion.
 				   Since this is tested every time the path is expanded, it only needs to be checked for the subtours from any of the existing nodes to the new node.
-				   If the criterion is violated for any of the subtours, the path is discontinues. */
-
+				   If the criterion is violated for any of the subtours, the path is discontinued. */
+				
 				double lengthOfSubtour = edgesNodePair.get(currentPath[currentPath.length-1]).get(v).getGenCost();
+				/*First if is comparing to shortest path to previous node visited. Note that dijkstraDists refers to a hashmap with shortest paths between all node pairs (previously generated)*/
 				if(lengthOfSubtour <= dijkstraDists.get(currentPath[currentPath.length-1]).get(v) * localMaximumCostRatio){
+					/*if not violated, then loop through all previous nodes visited - potentially until origin*/
 					for(int i = currentPath.length  - 2; i >= 0; i--){
 						lengthOfSubtour += edgesNodePair.get(currentPath[i]).get(currentPath[i+1]).getGenCost();
 						if( lengthOfSubtour > dijkstraDists.get(currentPath[i]).get(v) * localMaximumCostRatio ){
+							/*if local detour constraint violated, then break*/
 							localConstraintViolated = true;
+							break;
 						}
 					}
 				} else {
@@ -1121,6 +1229,10 @@ public class Network {
 		out.print("Flow");
 		out.print(delim);
 		out.print("Generalized-cost");
+		out.print(delim);
+		out.print("Length");
+		out.print(delim);
+		out.print("Time");
 		out.print("\n");
 		for (HashMap<Integer, OD> m: ods.values()) {
 			for (OD od: m.values()) { // For each OD-pair
@@ -1142,7 +1254,12 @@ public class Network {
 						out.print(path.getFlow());
 						out.print(delim);
 						out.print(path.genCost);
-						out.println();
+						out.print(delim);
+						out.print(path.length);
+						out.print(delim);
+						if (RUM.betaTime > 0) {
+							out.print( (path.genCost-RUM.betaLength * path.length) / RUM.betaTime ); } else {out.print(-1);};
+							out.println();
 					}
 
 				}
@@ -1528,7 +1645,7 @@ public class Network {
 						odScanner.useLocale(Locale.ENGLISH);
 						destinationNode = odScanner.nextInt();
 						odScanner.next(); //skip :
-						demand = odScanner.nextDouble();
+						demand = odScanner.nextDouble() * demandScale;
 						if (demand > 0) {
 							if (!ods.containsKey(originNode)) {
 								ods.put(originNode, new HashMap<Integer,OD>());
@@ -1753,7 +1870,7 @@ public class Network {
 		}
 
 		Path path = new Path(edgesInPath,od);
-
+		
 		return path;
 	}
 
@@ -1833,6 +1950,7 @@ public class Network {
 					if (path.genCost <= threshold) {
 						path.enumeratorInProbabilityExpression = rum.computeEnumeratorInProbabilityExpression(path);
 						denominatorInProbabilityExpression += path.enumeratorInProbabilityExpression;
+						path.setHasBeenUsed(true);
 					} else path.enumeratorInProbabilityExpression = 0;
 
 				}

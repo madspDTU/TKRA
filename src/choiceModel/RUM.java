@@ -31,14 +31,14 @@ public abstract class RUM {
 	/**
 	 * Value of time (VoT) used in {@code computeEnumeratorInProbabilityExpression}.
 	 */
-	double betaTime = 1;
+	public static double betaTime = 1.0;
 
 	/**
 	 * The effect of time on cost; on networks like Sioux Falls where the link length
 	 * is arbitrarily set to be the same as the link free flow travel time, this should 
 	 * be set to 0.
 	 */
-	double betaLength = 0;
+	public static double betaLength = 0.0;
 
 	/**
 	 * maybe somewhat of a misnomer, "generalized cost" in this context means the linear

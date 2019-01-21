@@ -32,8 +32,9 @@ public class multipleAssignments {
 		String localStorageDirectory = "C:/Projekter/Programming/Java/storage/" + networkName + "/";
 		new File(localStorageDirectory).mkdir();
 		
-		
-		Network network = new Network(networkDirectory + networkName, isNetworkBidirectional); //Initialize network
+		double demandScale;
+		demandScale = 1.0;
+		Network network = new Network(networkDirectory + networkName, isNetworkBidirectional, demandScale); //Initialize network
 		network.setMaximumCostRatio(maximumCostRatio);
 		network.setLocalMaximumCostRatio(localMaximumCostRatio);
 		network.minimumFlowToBeConsideredUsed = 0; // Allows flows of 0 to be considered too. Switch to a value higher than 0 to make cut-off.
@@ -62,7 +63,7 @@ public class multipleAssignments {
 			
 			rum.theta=x/10d;
 			
-			RSUET routeChoiceModel = new RSUET(rum, phi,omega); //set up the TMNL RSUET(min, min + 10)
+			RSUET routeChoiceModel = new RSUET(rum, phi,omega, demandScale); //set up the TMNL RSUET(min, min + 10)
 			routeChoiceModel.maximumCostRatio = maximumCostRatio;
 			routeChoiceModel.epsilon = 0.00005;
 

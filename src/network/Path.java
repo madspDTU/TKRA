@@ -7,6 +7,13 @@ import choiceModel.RSUET;
 import choiceModel.RouteChoiceModel;
 
 public class Path implements Comparable<Path>{
+	
+	/**
+	 * Boolean variable showing if a path has ever been used.
+	 */
+	
+	private boolean hasBeenUsed;
+	
 	/**
 	 * Path as an ordered set of edges, e.g. (1,5) (5,8) (8,1)
 	 * @see Edge
@@ -87,14 +94,18 @@ public class Path implements Comparable<Path>{
 	 * @param od the OD relation that the path belongs to
 	 */
 	public Path(ArrayList<Edge> edges, OD od) {
+		this(edges,od,false);
+	}
+	
+	public Path(ArrayList<Edge> edges, OD od, boolean hasBeenUsed) {
 		//		this.nodeSeq = nodeSeq;
 		this.edges = edges;
-
 		length = 0;
 		for (int i = 0; i < edges.size(); i++) {
 			length += edges.get(i).getLength();
 		}
 		this.od = od;
+		this.hasBeenUsed = hasBeenUsed;
 	}
 
 	/**
@@ -172,6 +183,10 @@ public class Path implements Comparable<Path>{
 		return flow;
 	}
 
+	public boolean getHasBeenUsed() {
+		return hasBeenUsed;
+	}
+	
 	public int getO(){
 		return this.od.O;
 	}
@@ -189,7 +204,7 @@ public class Path implements Comparable<Path>{
 			edge.addFlow(this.flow);
 		}
 	}
-
+	
 	public void setAuxFlow(double auxFlow) {
 		this.auxFlow = auxFlow;
 	}
@@ -202,6 +217,10 @@ public class Path implements Comparable<Path>{
 			throw new Error("Flow may only be set to a real number.");
 		}
 		this.flow = flow;
+	}
+	
+	public void setHasBeenUsed(boolean hasBeenUsed) {
+		this.hasBeenUsed = hasBeenUsed;
 	}
 
 	/**

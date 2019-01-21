@@ -31,17 +31,22 @@ public class RSUET extends RouteChoiceModel {
 	 * {@linkplain RouteChoiceModel}.
 	 */
 
+	boolean consEnumIte;
+
+
 	/**
 	 * d for gamma in RSUET(min,omega)
 	 */
 	public int d = 2;
 
+	double demandScale;
+
 	/**
 	 * The maximum allowed sum of gap measures for the
 	 * for a solution to be considered an equilibrium.
 	 */
-	public double epsilon = 0.00005;
-	
+	public double epsilon = 0.0000005;
+
 	/**
 	 * The minimum number of routes present in a restricted choice set 
 	 * for {@code doThresholdConditionPhase} to remove one path. By default,
@@ -62,7 +67,7 @@ public class RSUET extends RouteChoiceModel {
 	 * The iteration number at which the algorithm will "give up" trying
 	 * to reach equilibrium.
 	 */
-	public int itmax = 500;
+	public int itmax = 1000;
 
 	/**
 	 * Reference cost function that determines which routes must be used
@@ -94,7 +99,7 @@ public class RSUET extends RouteChoiceModel {
 	 * @see Utils#gamma(int, int)
 	 * @see RSUET#cutUniversalChoiceSetAlgorithm(Network)
 	 */
-	public int dForUniversalChoiceSetAlgMNL = 1;
+	public int dForUniversalChoiceSetAlgMNL = 2;
 
 	/**
 	 * To avoid manipulating irrelevant routes in the universal choice set in 
@@ -103,9 +108,15 @@ public class RSUET extends RouteChoiceModel {
 	 * considered.
 	 */
 	public double maximumCostRatio = 8;
-	
-	
-	
+
+
+	private double bound;
+
+
+	private boolean useOnlyConsideredPaths;
+	private boolean exportConsideredPaths;
+
+
 	public static int doInitialRSUET;
 	public static int laterIteration;
 
@@ -117,10 +128,16 @@ public class RSUET extends RouteChoiceModel {
 	 * @param omega the upper reference cost function
 	 * @see RefCostFun
 	 */
-	public RSUET(RUM rum, RefCostFun phi, RefCostFun omega) {
+	public RSUET(RUM rum, RefCostFun phi, RefCostFun omega, double demandScale, boolean consEnumIte, double bound,
+			              boolean useOnlyConsideredPaths, boolean exportConsideredPaths) {
 		this.setRum(rum);
 		this.phi = phi;
 		this.omega = omega;
+		this.demandScale=demandScale;
+		this.consEnumIte=consEnumIte;
+		this.bound=bound;
+		this.useOnlyConsideredPaths = useOnlyConsideredPaths;
+		this.exportConsideredPaths = exportConsideredPaths;
 	}
 
 
@@ -266,9 +283,10 @@ public class RSUET extends RouteChoiceModel {
 	private ConvergencePattern cutUniversalChoiceSetAlgorithm(Network network) throws IOException {
 		boolean doRSUET = true;
 		//TODO workaround: Avoid doing all-or-nothing if transformed costs would be enormous
-		if (rum.theta >= 0.75 && rum instanceof TMNL) doRSUET = false;
+		//if (rum.theta >= 0.75 && rum instanceof TMNL) doRSUET = false;
+		if (rum.theta >= 1.1 && rum instanceof TMNL) doRSUET = false;
 		if (doInitialRSUET == 0  && laterIteration==1) doRSUET = false;
-		
+
 		if (doRSUET) columnGenerationAlgorithm(network);
 
 		ConvergencePattern conv = new ConvergencePattern();
@@ -279,14 +297,18 @@ public class RSUET extends RouteChoiceModel {
 		int mnl = getDToUseInUniversalChoiceSetAlg();
 
 		//if the universal choice set is not generated, do it now.
-		network.generateUniversalChoiceSets();
+		if(!useOnlyConsideredPaths) {
+			network.generateUniversalChoiceSets();
+		} else {
+			network.loadConsideredPaths();
+		}
 		network.universalChoiceSetsStored = true;
-		
-		
+
+
 
 		//Heuristically "cut" universal choice sets down to a more manageable size
 		network.cutUniversalChoiceSets(maximumCostRatio);    //madsp: Should not be used, when constrained enumeration is used for creating the "universal" choice set.
-		
+
 		network.updatePathCosts();
 
 		//proceed to the MSA and loop until convergence is reached
@@ -297,14 +319,19 @@ public class RSUET extends RouteChoiceModel {
 		int iterationForGamma = 1;
 		int maxIterations = itmax;
 		int numIterationsWithOuterConvergenceBeforeRedistribution = 3;
-		int iterationToReset = (doRSUET) ? 80: 150;
-		if (!(rum instanceof TMNL)) iterationToReset += 40;
+		int iterationToReset = (doRSUET) ? 120: 150;
+
+
+
+		if (!(rum instanceof TMNL)) iterationToReset += 50;
 		int latestTimeToStartRedistribution = 100;
 		int numIterationsToRampUpMnl = 10000; //disabled
 
 		int numTimesInARowWithOuterConvergence = 0;
 		while (!isConverged && !hasFailed) {
-			if (iterationNumber == iterationToReset) iterationForGamma = 7;
+			if((iterationNumber > iterationToReset)) iterationToReset +=50;
+			if (iterationNumber == iterationToReset) iterationForGamma = 30;
+			if (iterationNumber == iterationToReset) System.out.println("IterationToReset: " + (iterationToReset));
 			double gamma = Utils.gamma(iterationForGamma,mnl);
 			network.unrestrictedMasterProblemInnerLogit(rum, omega,gamma);			 
 
@@ -317,7 +344,9 @@ public class RSUET extends RouteChoiceModel {
 
 			network.updateEdgeCosts(rum);
 			network.updatePathCosts();
-
+			if (consEnumIte) {
+				network.consEnum(bound);
+			}
 			if(iterationNumber == 1 && !doRSUET) {
 				iterationNumber++;
 				continue;
@@ -354,6 +383,9 @@ public class RSUET extends RouteChoiceModel {
 		}
 		if (!hasFailed) {
 			System.out.println("TMNL successfully converged. Number of iterations: " + (iterationNumber-1));
+			if(exportConsideredPaths) {
+				network.exportConsideredPaths();
+			}
 		} else {
 			System.out.println("TMNL failed to converge.");
 		}
@@ -417,7 +449,8 @@ public class RSUET extends RouteChoiceModel {
 			// od
 			for (Path path : od.restrictedChoiceSet) {
 				// Redistribute flow
-				path.setFlow(path.getFlow() + extraFlow * path.getFlow() / (od.demand - extraFlow));
+				//path.setFlow(path.getFlow() + extraFlow * path.getFlow() / (od.demand - extraFlow));
+				path.setFlow(path.getFlow() + extraFlow * path.p);
 
 			}
 
@@ -442,6 +475,10 @@ public class RSUET extends RouteChoiceModel {
 	private int getDToUseInUniversalChoiceSetAlg() {
 		return (this.rum instanceof TMNL)? dForUniversalChoiceSetAlgTMNL: dForUniversalChoiceSetAlgMNL;
 	}
+
+
+
+
 
 	/**
 	 * This method prints details about the route choice model, i.e. the RSUET.
@@ -496,8 +533,24 @@ public class RSUET extends RouteChoiceModel {
 		out.print(delimiter);
 		out.println(maximumCostRatio);
 
-		out.close();
+		out.print("demandscalefactor");
+		out.print(delimiter);
+		out.println(demandScale);
+		
+		out.print("ConstrainedEnumerationEachIte");
+		out.print(delimiter);
+		out.println(consEnumIte);
 
+		out.print("betaLength");
+		out.print(delimiter);
+		out.println(rum.betaLength);
+		
+
+		out.print("betaTime");
+		out.print(delimiter);
+		out.println(rum.betaTime);
+		out.close();
+		
 		System.out.println("Parameters were successfully output to " + file.getName() + ".");
 	}
 

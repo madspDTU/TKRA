@@ -38,6 +38,8 @@ public class OD{
 	 */
 	ArrayList<Path> R;
 	
+	public ArrayList<Path> pseudoR;
+	
 	/**
 	 * Used by private methods in the {@linkplain Network} class.
 	 */
